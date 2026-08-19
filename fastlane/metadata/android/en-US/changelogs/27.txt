@@ -1,0 +1,2 @@
+Stable public release with improved Android layout, corrected back navigation,
+system bar insets, and a fixed startup crash.

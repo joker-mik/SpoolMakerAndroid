@@ -1,0 +1,9 @@
+Spool Maker is a free Android app for reading and writing compatible NTAG216
+NFC spool tags.
+
+It can read material and weight information, write new tags, and import
+Cura/UltiMaker material files. A local material library stores manufacturer,
+material, color, GUID, and spool weight.
+
+Spool Maker is community software and is not an official product of UltiMaker
+or DA-Osborne. The source code is licensed under GPL-3.0-or-later.

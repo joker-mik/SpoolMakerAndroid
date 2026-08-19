@@ -1,0 +1,21 @@
+.gradle/
+.idea/
+local.properties
+build/
+**/build/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+.DS_Store
+signing.properties
+*.p12
+*.jks
+*.keystore
+
+# Release signing material
+release-key.p12
+spoolmaker-release.p12
+
+# Local F-Droid tooling
+.fdroidserver/

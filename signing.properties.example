@@ -1,0 +1,6 @@
+# Optional: only needed if you want a release APK signed with your existing
+# Spool Maker update certificate. Never commit the real file or the key.
+storeFile=/absolute/path/to/SpoolMaker-Update-Signing-Key.p12
+storePassword=CHANGE_ME
+keyAlias=spoolmaker-update
+keyPassword=CHANGE_ME

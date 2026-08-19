@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+def signingPropertiesFile = rootProject.file('signing.properties')
+def signingProperties = new Properties()
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
+android {
+    namespace 'de.spoolmaker.android'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'de.spoolmaker.android'
+        minSdk 23
+        targetSdk 36
+        versionCode 27
+        versionName '1.1.17'
+
+        testInstrumentationRunner 'android.app.InstrumentationTestRunner'
+    }
+
+    signingConfigs {
+        if (signingPropertiesFile.exists()) {
+            release {
+                storeFile file(signingProperties['storeFile'])
+                storePassword signingProperties['storePassword']
+                keyAlias signingProperties['keyAlias']
+                keyPassword signingProperties['keyPassword']
+                storeType 'PKCS12'
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            if (signingPropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

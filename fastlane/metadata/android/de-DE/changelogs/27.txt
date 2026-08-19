@@ -1,0 +1,2 @@
+Stabiler oeffentlicher Stand mit verbessertem Android-Layout, korrigierter
+Zurueck-Navigation, Systemleisten-Abstaenden und behobenem Startfehler.

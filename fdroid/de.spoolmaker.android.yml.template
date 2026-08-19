@@ -1,0 +1,21 @@
+Categories:
+  - Development
+License: GPL-3.0-or-later
+SourceCode: https://github.com/GITHUB_USER/SpoolMakerAndroid
+IssueTracker: https://github.com/GITHUB_USER/SpoolMakerAndroid/issues
+
+RepoType: git
+Repo: https://github.com/GITHUB_USER/SpoolMakerAndroid.git
+
+Builds:
+  - versionName: 1.1.17
+    versionCode: 27
+    commit: FULL_COMMIT_SHA_OF_V1.1.17
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.1.17
+CurrentVersionCode: 27

@@ -1,0 +1,1 @@
+NFC-Spulentags lesen, schreiben und Materialdaten verwalten
