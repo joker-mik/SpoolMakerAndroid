@@ -20,6 +20,7 @@ import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -95,6 +96,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private ImageButton buttonEdit;
     private ImageButton buttonDelete;
     private Button buttonWrite;
+    private Spinner spinnerWriteDateMeaning;
+    private Button buttonWriteDate;
+    private final Calendar selectedWriteDate = Calendar.getInstance();
+    private final UltimakerTagCodec.DateMeaning[] writeDateMeanings = new UltimakerTagCodec.DateMeaning[]{
+            UltimakerTagCodec.DateMeaning.OPENED,
+            UltimakerTagCodec.DateMeaning.MANUFACTURED,
+            UltimakerTagCodec.DateMeaning.PURCHASED,
+            UltimakerTagCodec.DateMeaning.CREATED,
+            UltimakerTagCodec.DateMeaning.NONE
+    };
 
     private View readPage;
     private View writePage;
@@ -139,6 +150,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             materialStore = new MaterialStore(this);
             nfcAdapter = NfcAdapter.getDefaultAdapter(this);
             bindViews();
+            configureWriteDateUi();
             configureMaterialSpinner();
             configureActions();
             configureNavigationUi();
@@ -453,6 +465,99 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         tabWriteIcon = findViewById(R.id.tabWriteIcon);
         textPageTitle = findViewById(R.id.textPageTitle);
         textPageBody = findViewById(R.id.textPageBody);
+    }
+
+    private void configureWriteDateUi() {
+        if (!(editRemainingWeightGrams.getParent() instanceof ViewGroup)) {
+            throw new IllegalStateException("Schreibbereich hat keinen geeigneten Container fuer Datumsfelder.");
+        }
+
+        ViewGroup parent = (ViewGroup) editRemainingWeightGrams.getParent();
+        LinearLayout dateSection = new LinearLayout(this);
+        dateSection.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        sectionParams.topMargin = dp(12);
+        sectionParams.bottomMargin = dp(4);
+
+        TextView dateMeaningLabel = new TextView(this);
+        dateMeaningLabel.setText("Filament-Datum");
+        dateMeaningLabel.setTextColor(getColor(R.color.text_primary));
+        dateMeaningLabel.setTextSize(16f);
+        dateMeaningLabel.setTypeface(null, Typeface.BOLD);
+        dateMeaningLabel.setPadding(0, 0, 0, dp(4));
+
+        spinnerWriteDateMeaning = new Spinner(this);
+        String[] labels = new String[]{
+                "Geöffnet am",
+                "Herstellungsdatum",
+                "Kaufdatum",
+                "Spule angelegt am",
+                "Kein Datum"
+        };
+        ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        dateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerWriteDateMeaning.setAdapter(dateAdapter);
+        spinnerWriteDateMeaning.setSelection(0);
+
+        TextView dateLabel = new TextView(this);
+        dateLabel.setText("Datum");
+        dateLabel.setTextColor(getColor(R.color.text_primary));
+        dateLabel.setTextSize(16f);
+        dateLabel.setTypeface(null, Typeface.BOLD);
+        dateLabel.setPadding(0, dp(10), 0, dp(4));
+
+        buttonWriteDate = new Button(this);
+        buttonWriteDate.setAllCaps(false);
+        updateDateButton(buttonWriteDate, selectedWriteDate);
+        buttonWriteDate.setOnClickListener(view -> new DatePickerDialog(
+                this,
+                (picker, year, month, day) -> {
+                    selectedWriteDate.set(Calendar.YEAR, year);
+                    selectedWriteDate.set(Calendar.MONTH, month);
+                    selectedWriteDate.set(Calendar.DAY_OF_MONTH, day);
+                    updateDateButton(buttonWriteDate, selectedWriteDate);
+                },
+                selectedWriteDate.get(Calendar.YEAR),
+                selectedWriteDate.get(Calendar.MONTH),
+                selectedWriteDate.get(Calendar.DAY_OF_MONTH)).show());
+
+        spinnerWriteDateMeaning.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                boolean hasDate = writeDateMeanings[position] != UltimakerTagCodec.DateMeaning.NONE;
+                buttonWriteDate.setEnabled(hasDate);
+                if (hasDate) {
+                    updateDateButton(buttonWriteDate, selectedWriteDate);
+                } else {
+                    buttonWriteDate.setText("Kein Datum");
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                buttonWriteDate.setEnabled(false);
+                buttonWriteDate.setText("Kein Datum");
+            }
+        });
+
+        TextView hint = new TextView(this);
+        hint.setText("Das gewählte Datum wird auf neu erstellten SpoolMaker-Tags gespeichert.");
+        hint.setTextColor(getColor(R.color.text_secondary));
+        hint.setTextSize(13f);
+        hint.setPadding(0, dp(4), 0, 0);
+
+        dateSection.addView(dateMeaningLabel);
+        dateSection.addView(spinnerWriteDateMeaning);
+        dateSection.addView(dateLabel);
+        dateSection.addView(buttonWriteDate);
+        dateSection.addView(hint);
+
+        int insertIndex = parent.indexOfChild(editRemainingWeightGrams) + 1;
+        parent.addView(dateSection, insertIndex, sectionParams);
     }
 
     private void configureMaterialSpinner() {
@@ -925,93 +1030,59 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void showWriteConfirmation(MaterialProfile profile, long totalWeightMg,
                                        long remainingWeightMg) {
+        int datePosition = spinnerWriteDateMeaning == null
+                ? writeDateMeanings.length - 1
+                : spinnerWriteDateMeaning.getSelectedItemPosition();
+        if (datePosition < 0 || datePosition >= writeDateMeanings.length) {
+            datePosition = writeDateMeanings.length - 1;
+        }
+
+        UltimakerTagCodec.DateMeaning meaning = writeDateMeanings[datePosition];
+        long dateEpochSeconds = meaning == UltimakerTagCodec.DateMeaning.NONE
+                ? 0L : toUtcDateEpochSeconds(selectedWriteDate);
+        String dateSummary = meaning == UltimakerTagCodec.DateMeaning.NONE
+                ? "Kein eigenes Datum"
+                : writeDateMeaningLabel(meaning) + ": "
+                + DateFormat.getDateInstance(DateFormat.MEDIUM).format(selectedWriteDate.getTime());
+
         String message = profile.getDisplayName() + "\n"
                 + profile.getGuid() + "\n\n"
                 + "Gesamtmenge: " + formatWeight(totalWeightMg) + "\n"
-                + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n\n"
-                + "Neue SpoolMaker-Tags speichern eine Datumsart in den beiden von S5/S8 "
-                + "nicht ausgewerteten Materialbytes. Das Zeitfeld wird als Unix-Sekunden/Double gespeichert.\n\n"
+                + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n"
+                + "Filament-Datum: " + dateSummary + "\n\n"
                 + "Der vorhandene Spuleninhalt wird ueberschrieben. Gesperrte Tags koennen nicht beschrieben werden.";
-
-        UltimakerTagCodec.DateMeaning[] meanings = new UltimakerTagCodec.DateMeaning[]{
-                UltimakerTagCodec.DateMeaning.NONE,
-                UltimakerTagCodec.DateMeaning.MANUFACTURED,
-                UltimakerTagCodec.DateMeaning.PURCHASED,
-                UltimakerTagCodec.DateMeaning.OPENED,
-                UltimakerTagCodec.DateMeaning.CREATED
-        };
-        String[] labels = new String[]{
-                "Kein eigenes Datum",
-                "Herstellungsdatum",
-                "Kaufdatum",
-                "Geoeffnet am",
-                "Spule angelegt am"
-        };
-        Calendar selectedDate = Calendar.getInstance();
-
-        LinearLayout options = new LinearLayout(this);
-        options.setOrientation(LinearLayout.VERTICAL);
-        options.setPadding(dp(24), 0, dp(24), 0);
-
-        TextView dateLabel = new TextView(this);
-        dateLabel.setText("Filament-Datum");
-        dateLabel.setTextColor(getColor(R.color.text_primary));
-        dateLabel.setTypeface(null, Typeface.BOLD);
-
-        Spinner dateMeaning = new Spinner(this);
-        ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, labels);
-        dateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        dateMeaning.setAdapter(dateAdapter);
-        dateMeaning.setSelection(3); // Geoeffnet am
-
-        Button dateButton = new Button(this);
-        updateDateButton(dateButton, selectedDate);
-        dateMeaning.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                dateButton.setEnabled(meanings[position] != UltimakerTagCodec.DateMeaning.NONE);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                dateButton.setEnabled(false);
-            }
-        });
-        dateButton.setOnClickListener(view -> new DatePickerDialog(
-                this,
-                (picker, year, month, day) -> {
-                    selectedDate.set(Calendar.YEAR, year);
-                    selectedDate.set(Calendar.MONTH, month);
-                    selectedDate.set(Calendar.DAY_OF_MONTH, day);
-                    updateDateButton(dateButton, selectedDate);
-                },
-                selectedDate.get(Calendar.YEAR),
-                selectedDate.get(Calendar.MONTH),
-                selectedDate.get(Calendar.DAY_OF_MONTH)).show());
-
-        options.addView(dateLabel);
-        options.addView(dateMeaning);
-        options.addView(dateButton);
 
         new AlertDialog.Builder(this)
                 .setTitle("NFC-Tag schreiben?")
                 .setMessage(message)
-                .setView(options)
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Schreiben aktivieren", (dialog, which) -> {
-                    UltimakerTagCodec.DateMeaning meaning = meanings[dateMeaning.getSelectedItemPosition()];
                     pendingWriteMaterial = profile;
                     pendingWriteTotalWeightMg = totalWeightMg;
                     pendingWriteRemainingWeightMg = remainingWeightMg;
                     pendingWriteDateMeaning = meaning;
-                    pendingWriteDateEpochSeconds = meaning == UltimakerTagCodec.DateMeaning.NONE
-                            ? 0L : toUtcDateEpochSeconds(selectedDate);
+                    pendingWriteDateEpochSeconds = dateEpochSeconds;
                     pendingAction = PendingAction.WRITE;
                     setStatus("Schreiben ist aktiviert.");
                     showNfcPrompt(true);
                 })
                 .show();
+    }
+
+    private String writeDateMeaningLabel(UltimakerTagCodec.DateMeaning meaning) {
+        switch (meaning) {
+            case MANUFACTURED:
+                return "Herstellungsdatum";
+            case PURCHASED:
+                return "Kaufdatum";
+            case OPENED:
+                return "Geöffnet am";
+            case CREATED:
+                return "Spule angelegt am";
+            case NONE:
+            default:
+                return "Kein Datum";
+        }
     }
 
     private void updateDateButton(Button button, Calendar date) {
