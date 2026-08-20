@@ -28,57 +28,117 @@ public final class UltimakerTagCodec {
     private static final int FLAG_SR = 0x10;
     private static final int FLAG_IL = 0x08;
 
-    private static final byte[] TYPE_MATERIAL = "ultimaker.nl:material".getBytes(StandardCharsets.US_ASCII);
-    private static final byte[] TYPE_SIGNATURE = "Sig".getBytes(StandardCharsets.US_ASCII);
-    private static final byte[] TYPE_STATUS = "ultimaker.nl:stat".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] TYPE_MATERIAL =
+            "ultimaker.nl:material".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] TYPE_SIGNATURE =
+            "Sig".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] TYPE_STATUS =
+            "ultimaker.nl:stat".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] ID_MATERIAL = "1".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] ID_STATUS = "2".getBytes(StandardCharsets.US_ASCII);
 
     private static final int MATERIAL_PAYLOAD_LENGTH = 108;
+    private static final int MATERIAL_INTERPRETED_LENGTH = 106;
     private static final int STATUS_PAYLOAD_LENGTH = 20;
     private static final int DEFAULT_STATION_ID = 0xAFFE;
     private static final String DEFAULT_BATCH_CODE = "123456789AB";
 
+    // SpoolMaker extension inside the two bytes that S5/S8 firmware does not interpret.
+    // Byte 106: 0x53 ('S'), byte 107: DateMeaning code.
+    private static final int SPOOLMAKER_DATE_MARKER = 0x53;
+
+    public enum DateMeaning {
+        NONE(0),
+        MANUFACTURED(1),
+        PURCHASED(2),
+        OPENED(3),
+        CREATED(4);
+
+        private final int code;
+
+        DateMeaning(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        private static DateMeaning fromCode(int code) {
+            for (DateMeaning value : values()) {
+                if (value.code == code) {
+                    return value;
+                }
+            }
+            return NONE;
+        }
+    }
+
     private UltimakerTagCodec() {
     }
 
-    public static byte[] encodeSpool(String materialGuid, String uidHex, long weightMg) {
-        return encodeSpool(materialGuid, uidHex, weightMg, weightMg, 0L, 0L);
-    }
-
-    public static byte[] encodeSpool(String materialGuid, String uidHex, long totalWeightMg,
-                                     long remainingWeightMg) {
-        return encodeSpool(materialGuid, uidHex, totalWeightMg, remainingWeightMg, 0L, 0L);
-    }
-
-    public static byte[] encodeSpool(String materialGuid, String uidHex, long weightMg,
-                                     long manufacturingTimestamp, long totalUsageDurationSeconds) {
-        return encodeSpool(materialGuid, uidHex, weightMg, weightMg,
-                manufacturingTimestamp, totalUsageDurationSeconds);
-    }
-
-    public static byte[] encodeSpool(String materialGuid, String uidHex, long totalWeightMg,
-                                     long remainingWeightMg, long manufacturingTimestamp,
-                                     long totalUsageDurationSeconds) {
+    /**
+     * Encodes a new SpoolMaker tag.
+     *
+     * <p>This is intentionally the only writer entry point. New tags always use
+     * programming-station id 0xAFFE and SpoolMaker metadata in material bytes
+     * 106/107. If {@code dateMeaning != NONE}, the 8-byte material time field is
+     * written as a big-endian IEEE-754 double containing Unix seconds. For
+     * {@code NONE}, the time field is 0.0.</p>
+     */
+    public static byte[] encodeSpool(String materialGuid, String uidHex,
+                                     long totalWeightMg, long remainingWeightMg,
+                                     DateMeaning dateMeaning, long dateEpochSeconds) {
         if (totalWeightMg <= 0 || totalWeightMg > MAX_UNSIGNED_INT) {
-            throw new IllegalArgumentException("Gesamtgewicht liegt ausserhalb des 32-Bit-Tagformats.");
+            throw new IllegalArgumentException(
+                    "Gesamtgewicht liegt ausserhalb des 32-Bit-Tagformats.");
         }
         if (remainingWeightMg < 0 || remainingWeightMg > totalWeightMg
                 || remainingWeightMg > MAX_UNSIGNED_INT) {
-            throw new IllegalArgumentException("Restgewicht muss zwischen 0 und Gesamtgewicht liegen.");
+            throw new IllegalArgumentException(
+                    "Restgewicht muss zwischen 0 und Gesamtgewicht liegen.");
         }
+        if (dateMeaning == null) {
+            throw new IllegalArgumentException("Datumsart fehlt.");
+        }
+        if (dateMeaning == DateMeaning.NONE) {
+            dateEpochSeconds = 0L;
+        } else if (dateEpochSeconds <= 0L) {
+            throw new IllegalArgumentException("Datum muss nach dem Unix-Epoch liegen.");
+        }
+
         UUID materialUuid = UUID.fromString(materialGuid);
         String serial = sanitizeSerial(uidHex);
+        if (serial.length() != 14) {
+            throw new IllegalArgumentException(
+                    "NTAG216-UID muss als 7 Byte bzw. 14 Hex-Zeichen vorliegen.");
+        }
 
-        byte[] materialPayload = encodeMaterialPayload(materialUuid, serial, manufacturingTimestamp);
-        byte[] statusPayload = encodeStatusPayload(totalWeightMg, remainingWeightMg, totalUsageDurationSeconds);
+        double dateSeconds = dateMeaning == DateMeaning.NONE
+                ? 0.0d : (double) dateEpochSeconds;
+        long dateBits = Double.doubleToRawLongBits(dateSeconds);
+
+        byte[] materialPayload = encodeMaterialPayload(
+                materialUuid,
+                serial,
+                dateBits,
+                new byte[]{(byte) SPOOLMAKER_DATE_MARKER, (byte) dateMeaning.getCode()});
+
+        // A newly created tag starts with two identical valid status records.
+        // The printer will alternate them later. Usage starts at zero.
+        byte[] statusPayload = encodeStatusPayload(
+                totalWeightMg, remainingWeightMg, BigInteger.ZERO);
         byte[] signaturePayload = new byte[]{0x20, 0x00};
 
         ByteArrayOutputStream output = new ByteArrayOutputStream(228);
-        append(output, encodeRecord(true, false, TNF_EXTERNAL_TYPE, TYPE_MATERIAL, ID_MATERIAL, materialPayload));
-        append(output, encodeRecord(false, false, TNF_WELL_KNOWN, TYPE_SIGNATURE, null, signaturePayload));
-        append(output, encodeRecord(false, false, TNF_EXTERNAL_TYPE, TYPE_STATUS, ID_STATUS, statusPayload));
-        append(output, encodeRecord(false, true, TNF_EXTERNAL_TYPE, TYPE_STATUS, ID_STATUS, statusPayload));
+        append(output, encodeRecord(true, false, TNF_EXTERNAL_TYPE,
+                TYPE_MATERIAL, ID_MATERIAL, materialPayload));
+        append(output, encodeRecord(false, false, TNF_WELL_KNOWN,
+                TYPE_SIGNATURE, null, signaturePayload));
+        append(output, encodeRecord(false, false, TNF_EXTERNAL_TYPE,
+                TYPE_STATUS, ID_STATUS, statusPayload));
+        append(output, encodeRecord(false, true, TNF_EXTERNAL_TYPE,
+                TYPE_STATUS, ID_STATUS, statusPayload));
 
         byte[] raw = output.toByteArray();
         int paddedLength = (raw.length + 3) & ~3;
@@ -98,8 +158,9 @@ public final class UltimakerTagCodec {
         List<DecodedStatusRecord> statuses = new ArrayList<>();
         List<byte[]> statusPayloads = new ArrayList<>();
         List<DecodedNdefRecord> publicRecords = new ArrayList<>();
+
         boolean signaturePresent = false;
-        boolean signatureValid = false;
+        boolean signatureMarkerMatches = false;
         int signatureValue = -1;
         byte[] signaturePayload = new byte[0];
         int signatureRecordCount = 0;
@@ -108,6 +169,7 @@ public final class UltimakerTagCodec {
         for (NdefRecord record : parsed.records) {
             recordIndex++;
             String type = new String(record.type, StandardCharsets.US_ASCII);
+
             publicRecords.add(new DecodedNdefRecord(
                     recordIndex,
                     record.flags,
@@ -118,8 +180,7 @@ public final class UltimakerTagCodec {
                     record.payload.length,
                     toHex(record.payload),
                     record.offset,
-                    record.length
-            ));
+                    record.length));
 
             if ("ultimaker.nl:material".equals(type)) {
                 materialRecordCount++;
@@ -139,8 +200,7 @@ public final class UltimakerTagCodec {
                         status.storedCrc,
                         status.calculatedCrc,
                         status.crcValid,
-                        toHex(status.payload)
-                ));
+                        toHex(status.payload)));
                 statusPayloads.add(status.payload);
             } else if ("Sig".equals(type)) {
                 signatureRecordCount++;
@@ -150,7 +210,7 @@ public final class UltimakerTagCodec {
                     if (record.payload.length == 2) {
                         signatureValue = ((record.payload[0] & 0xFF) << 8)
                                 | (record.payload[1] & 0xFF);
-                        signatureValid = signatureValue == 0x2000;
+                        signatureMarkerMatches = signatureValue == 0x2000;
                     }
                 }
             }
@@ -185,17 +245,19 @@ public final class UltimakerTagCodec {
         return new DecodedSpool(
                 material.guid,
                 material.serial,
-                material.timestampUnsigned,
+                material.timeFieldUnsigned,
+                material.timeFieldDoubleSeconds,
+                toHex(material.timeFieldBytes),
                 material.stationId,
                 material.batchCode,
                 material.version,
                 material.compatibility,
-                toHex(material.reservedBytes),
+                toHex(material.trailingBytes),
                 Collections.unmodifiableList(new ArrayList<>(statuses)),
                 allStatusCrcValid,
                 copiesMatch,
                 signaturePresent,
-                signatureValid,
+                signatureMarkerMatches,
                 signatureValue,
                 toHex(signaturePayload),
                 materialRecordCount,
@@ -204,8 +266,7 @@ public final class UltimakerTagCodec {
                 extracted.tlvWrapped,
                 extracted.offset,
                 parsed.consumedLength,
-                tagUserMemory.length
-        );
+                tagUserMemory.length);
     }
 
     public static int crc8(byte[] data) {
@@ -248,6 +309,12 @@ public final class UltimakerTagCodec {
         }
     }
 
+    public static boolean uidMatchesSerial(String uidHex, String serial) {
+        String uid = sanitizeSerial(uidHex);
+        String stored = sanitizeSerial(serial);
+        return uid.length() == 14 && stored.length() == 14 && uid.equals(stored);
+    }
+
     public static String toHex(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return "";
@@ -259,29 +326,37 @@ public final class UltimakerTagCodec {
         return builder.toString();
     }
 
-    private static byte[] encodeMaterialPayload(UUID guid, String serial, long timestamp) {
-        ByteBuffer buffer = ByteBuffer.allocate(MATERIAL_PAYLOAD_LENGTH).order(ByteOrder.BIG_ENDIAN);
+    private static byte[] encodeMaterialPayload(UUID guid, String serial, long timeFieldBits,
+                                                byte[] trailingBytes) {
+        ByteBuffer buffer = ByteBuffer.allocate(MATERIAL_PAYLOAD_LENGTH)
+                .order(ByteOrder.BIG_ENDIAN);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         putFixed(buffer, serial.getBytes(StandardCharsets.UTF_8), 14);
-        buffer.putLong(timestamp);
+        buffer.putLong(timeFieldBits);
         buffer.putLong(guid.getMostSignificantBits());
         buffer.putLong(guid.getLeastSignificantBits());
         buffer.putShort((short) DEFAULT_STATION_ID);
         putFixed(buffer, DEFAULT_BATCH_CODE.getBytes(StandardCharsets.UTF_8), 64);
-        buffer.putShort((short) 0);
+        buffer.put(trailingBytes[0]);
+        buffer.put(trailingBytes[1]);
         return buffer.array();
     }
 
     private static byte[] encodeStatusPayload(long totalWeightMg, long remainingWeightMg,
-                                              long totalUsageDurationSeconds) {
-        ByteBuffer buffer = ByteBuffer.allocate(STATUS_PAYLOAD_LENGTH).order(ByteOrder.BIG_ENDIAN);
+                                              BigInteger totalUsageDurationSeconds) {
+        if (totalUsageDurationSeconds.signum() < 0
+                || totalUsageDurationSeconds.bitLength() > 64) {
+            throw new IllegalArgumentException("Nutzungsdauer passt nicht in uint64.");
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(STATUS_PAYLOAD_LENGTH)
+                .order(ByteOrder.BIG_ENDIAN);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.put((byte) UNIT_MILLIGRAMS);
         buffer.putInt((int) totalWeightMg);
         buffer.putInt((int) remainingWeightMg);
-        buffer.putLong(totalUsageDurationSeconds);
+        buffer.put(toUnsignedFixed(totalUsageDurationSeconds, 8));
         byte[] payload = buffer.array();
         payload[19] = (byte) crc8(payload, 0, 19);
         return payload;
@@ -290,8 +365,10 @@ public final class UltimakerTagCodec {
     private static byte[] encodeRecord(boolean messageBegin, boolean messageEnd, int tnf,
                                        byte[] type, byte[] id, byte[] payload) {
         if (type.length > 255 || payload.length > 255 || (id != null && id.length > 255)) {
-            throw new IllegalArgumentException("Record passt nicht in das Short-Record-Format.");
+            throw new IllegalArgumentException(
+                    "Record passt nicht in das Short-Record-Format.");
         }
+
         boolean hasId = id != null && id.length > 0;
         int flags = FLAG_SR | tnf;
         if (messageBegin) {
@@ -335,7 +412,6 @@ public final class UltimakerTagCodec {
         }
 
         while (cursor < memory.length) {
-            int typeOffset = cursor;
             int type = memory[cursor++] & 0xFF;
             if (type == 0x00) {
                 continue;
@@ -346,12 +422,14 @@ public final class UltimakerTagCodec {
             if (cursor >= memory.length) {
                 break;
             }
+
             int length = memory[cursor++] & 0xFF;
             if (length == 0xFF) {
                 if (cursor + 1 >= memory.length) {
                     throw new IllegalArgumentException("Beschaedigte NDEF-TLV-Laenge.");
                 }
-                length = ((memory[cursor] & 0xFF) << 8) | (memory[cursor + 1] & 0xFF);
+                length = ((memory[cursor] & 0xFF) << 8)
+                        | (memory[cursor + 1] & 0xFF);
                 cursor += 2;
             }
             if (cursor + length > memory.length) {
@@ -363,6 +441,7 @@ public final class UltimakerTagCodec {
             }
             cursor += length;
         }
+
         throw new IllegalArgumentException("Keine NDEF-Nachricht im Tag gefunden.");
     }
 
@@ -378,7 +457,8 @@ public final class UltimakerTagCodec {
             boolean hasId = (flags & FLAG_IL) != 0;
             boolean chunked = (flags & FLAG_CF) != 0;
             if (chunked) {
-                throw new IllegalArgumentException("Chunked NDEF-Records werden nicht unterstuetzt.");
+                throw new IllegalArgumentException(
+                        "Chunked NDEF-Records werden nicht unterstuetzt.");
             }
 
             int typeLength = readUnsignedByte(message, cursor++);
@@ -390,21 +470,25 @@ public final class UltimakerTagCodec {
                 cursor += 4;
             }
             int idLength = hasId ? readUnsignedByte(message, cursor++) : 0;
+
             if (payloadLength > Integer.MAX_VALUE) {
                 throw new IllegalArgumentException("NDEF-Payload ist zu gross.");
             }
-
             int required = typeLength + idLength + (int) payloadLength;
             if (required < 0 || cursor + required > message.length) {
                 throw new IllegalArgumentException("NDEF-Record ist unvollstaendig.");
             }
+
             byte[] type = Arrays.copyOfRange(message, cursor, cursor + typeLength);
             cursor += typeLength;
             byte[] id = Arrays.copyOfRange(message, cursor, cursor + idLength);
             cursor += idLength;
-            byte[] payload = Arrays.copyOfRange(message, cursor, cursor + (int) payloadLength);
+            byte[] payload = Arrays.copyOfRange(
+                    message, cursor, cursor + (int) payloadLength);
             cursor += (int) payloadLength;
-            records.add(new NdefRecord(flags, flags & 0x07, type, id, payload,
+
+            records.add(new NdefRecord(
+                    flags, flags & 0x07, type, id, payload,
                     recordOffset, cursor - recordOffset));
 
             if ((flags & FLAG_ME) != 0) {
@@ -414,39 +498,66 @@ public final class UltimakerTagCodec {
         }
 
         if (!foundEnd || records.isEmpty()) {
-            throw new IllegalArgumentException("NDEF-Nachricht besitzt kein gueltiges Ende.");
+            throw new IllegalArgumentException(
+                    "NDEF-Nachricht besitzt kein gueltiges Ende.");
         }
         return new ParsedRecords(records, cursor);
     }
 
     private static MaterialData decodeMaterialPayload(byte[] payload) {
-        if (payload.length < MATERIAL_PAYLOAD_LENGTH) {
+        if (payload.length < MATERIAL_INTERPRETED_LENGTH) {
             throw new IllegalArgumentException("Material-Payload ist zu kurz.");
         }
+
         ByteBuffer buffer = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN);
         int version = buffer.get() & 0xFF;
         int compatibility = buffer.get() & 0xFF;
+
         byte[] serialBytes = new byte[14];
         buffer.get(serialBytes);
-        byte[] timestampBytes = new byte[8];
-        buffer.get(timestampBytes);
+
+        byte[] timeFieldBytes = new byte[8];
+        buffer.get(timeFieldBytes);
+        BigInteger timeFieldUnsigned = unsignedBigInteger(timeFieldBytes);
+        double timeFieldDoubleSeconds = ByteBuffer.wrap(timeFieldBytes)
+                .order(ByteOrder.BIG_ENDIAN)
+                .getDouble();
+
         UUID guid = new UUID(buffer.getLong(), buffer.getLong());
         int stationId = buffer.getShort() & 0xFFFF;
+
         byte[] batchBytes = new byte[64];
         buffer.get(batchBytes);
-        byte[] reserved = new byte[2];
-        buffer.get(reserved);
+
+        int trailingLength = Math.min(
+                2, Math.max(0, payload.length - MATERIAL_INTERPRETED_LENGTH));
+        byte[] trailingBytes = trailingLength == 0
+                ? new byte[0]
+                : Arrays.copyOfRange(
+                        payload,
+                        MATERIAL_INTERPRETED_LENGTH,
+                        MATERIAL_INTERPRETED_LENGTH + trailingLength);
+
         String serial = decodeZeroTerminated(serialBytes);
         String batch = decodeZeroTerminated(batchBytes);
-        return new MaterialData(version, compatibility, serial,
-                unsignedBigInteger(timestampBytes), guid.toString().toLowerCase(Locale.US),
-                stationId, batch, reserved);
+        return new MaterialData(
+                version,
+                compatibility,
+                serial,
+                timeFieldBytes,
+                timeFieldUnsigned,
+                timeFieldDoubleSeconds,
+                guid.toString().toLowerCase(Locale.US),
+                stationId,
+                batch,
+                trailingBytes);
     }
 
     private static StatusData decodeStatusPayload(byte[] payload) {
         if (payload.length < STATUS_PAYLOAD_LENGTH) {
             throw new IllegalArgumentException("Status-Payload ist zu kurz.");
         }
+
         byte[] exactPayload = Arrays.copyOf(payload, STATUS_PAYLOAD_LENGTH);
         ByteBuffer buffer = ByteBuffer.wrap(exactPayload).order(ByteOrder.BIG_ENDIAN);
         int version = buffer.get() & 0xFF;
@@ -454,25 +565,46 @@ public final class UltimakerTagCodec {
         int unit = buffer.get() & 0xFF;
         long total = ((long) buffer.getInt()) & MAX_UNSIGNED_INT;
         long remaining = ((long) buffer.getInt()) & MAX_UNSIGNED_INT;
+
         byte[] usageBytes = new byte[8];
         buffer.get(usageBytes);
         BigInteger totalUsageDurationSeconds = unsignedBigInteger(usageBytes);
+
         int storedCrc = exactPayload[19] & 0xFF;
         int calculatedCrc = crc8(exactPayload, 0, 19);
-        return new StatusData(version, compatibility, unit, total, remaining,
-                totalUsageDurationSeconds, storedCrc, calculatedCrc,
-                storedCrc == calculatedCrc, exactPayload);
+
+        return new StatusData(
+                version,
+                compatibility,
+                unit,
+                total,
+                remaining,
+                totalUsageDurationSeconds,
+                storedCrc,
+                calculatedCrc,
+                storedCrc == calculatedCrc,
+                exactPayload);
     }
 
     private static BigInteger unsignedBigInteger(byte[] bytes) {
         return new BigInteger(1, bytes);
     }
 
+    private static byte[] toUnsignedFixed(BigInteger value, int length) {
+        byte[] source = value.toByteArray();
+        byte[] result = new byte[length];
+        int copyLength = Math.min(length, source.length);
+        System.arraycopy(source, source.length - copyLength,
+                result, length - copyLength, copyLength);
+        return result;
+    }
+
     private static String sanitizeSerial(String value) {
         if (value == null) {
             return "";
         }
-        String serial = value.replaceAll("[^0-9A-Fa-f]", "").toUpperCase(Locale.US);
+        String serial = value.replaceAll("[^0-9A-Fa-f]", "")
+                .toUpperCase(Locale.US);
         if (serial.length() > 14) {
             return serial.substring(0, 14);
         }
@@ -511,14 +643,16 @@ public final class UltimakerTagCodec {
 
     private static int readUnsignedByte(byte[] data, int offset) {
         if (offset < 0 || offset >= data.length) {
-            throw new IllegalArgumentException("Unerwartetes Ende der NDEF-Nachricht.");
+            throw new IllegalArgumentException(
+                    "Unerwartetes Ende der NDEF-Nachricht.");
         }
         return data[offset] & 0xFF;
     }
 
     private static long readUnsignedInt(byte[] data, int offset) {
         if (offset < 0 || offset + 4 > data.length) {
-            throw new IllegalArgumentException("Unerwartetes Ende der NDEF-Nachricht.");
+            throw new IllegalArgumentException(
+                    "Unerwartetes Ende der NDEF-Nachricht.");
         }
         return ((long) (data[offset] & 0xFF) << 24)
                 | ((long) (data[offset + 1] & 0xFF) << 16)
@@ -561,8 +695,8 @@ public final class UltimakerTagCodec {
         private final int offset;
         private final int length;
 
-        private NdefRecord(int flags, int tnf, byte[] type, byte[] id, byte[] payload,
-                           int offset, int length) {
+        private NdefRecord(int flags, int tnf, byte[] type, byte[] id,
+                           byte[] payload, int offset, int length) {
             this.flags = flags;
             this.tnf = tnf;
             this.type = type;
@@ -577,23 +711,28 @@ public final class UltimakerTagCodec {
         private final int version;
         private final int compatibility;
         private final String serial;
-        private final BigInteger timestampUnsigned;
+        private final byte[] timeFieldBytes;
+        private final BigInteger timeFieldUnsigned;
+        private final double timeFieldDoubleSeconds;
         private final String guid;
         private final int stationId;
         private final String batchCode;
-        private final byte[] reservedBytes;
+        private final byte[] trailingBytes;
 
         private MaterialData(int version, int compatibility, String serial,
-                             BigInteger timestampUnsigned, String guid, int stationId,
-                             String batchCode, byte[] reservedBytes) {
+                             byte[] timeFieldBytes, BigInteger timeFieldUnsigned,
+                             double timeFieldDoubleSeconds, String guid,
+                             int stationId, String batchCode, byte[] trailingBytes) {
             this.version = version;
             this.compatibility = compatibility;
             this.serial = serial;
-            this.timestampUnsigned = timestampUnsigned;
+            this.timeFieldBytes = timeFieldBytes;
+            this.timeFieldUnsigned = timeFieldUnsigned;
+            this.timeFieldDoubleSeconds = timeFieldDoubleSeconds;
             this.guid = guid;
             this.stationId = stationId;
             this.batchCode = batchCode;
-            this.reservedBytes = reservedBytes;
+            this.trailingBytes = trailingBytes;
         }
     }
 
@@ -609,9 +748,11 @@ public final class UltimakerTagCodec {
         private final boolean crcValid;
         private final byte[] payload;
 
-        private StatusData(int version, int compatibility, int unit, long totalAmount,
-                           long remainingAmount, BigInteger totalUsageDurationSeconds,
-                           int storedCrc, int calculatedCrc, boolean crcValid, byte[] payload) {
+        private StatusData(int version, int compatibility, int unit,
+                           long totalAmount, long remainingAmount,
+                           BigInteger totalUsageDurationSeconds,
+                           int storedCrc, int calculatedCrc,
+                           boolean crcValid, byte[] payload) {
             this.version = version;
             this.compatibility = compatibility;
             this.unit = unit;
@@ -683,8 +824,9 @@ public final class UltimakerTagCodec {
 
         private DecodedStatusRecord(int index, int version, int compatibility, int unit,
                                     long totalAmount, long remainingAmount,
-                                    BigInteger totalUsageDurationSeconds, int storedCrc,
-                                    int calculatedCrc, boolean crcValid, String payloadHex) {
+                                    BigInteger totalUsageDurationSeconds,
+                                    int storedCrc, int calculatedCrc,
+                                    boolean crcValid, String payloadHex) {
             this.index = index;
             this.version = version;
             this.compatibility = compatibility;
@@ -704,8 +846,12 @@ public final class UltimakerTagCodec {
         public int getUnit() { return unit; }
         public long getTotalAmount() { return totalAmount; }
         public long getRemainingAmount() { return remainingAmount; }
-        public BigInteger getTotalUsageDurationSecondsUnsigned() { return totalUsageDurationSeconds; }
-        public long getTotalUsageDurationSeconds() { return totalUsageDurationSeconds.longValue(); }
+        public BigInteger getTotalUsageDurationSecondsUnsigned() {
+            return totalUsageDurationSeconds;
+        }
+        public long getTotalUsageDurationSeconds() {
+            return totalUsageDurationSeconds.longValue();
+        }
         public int getStoredCrc() { return storedCrc; }
         public int getCalculatedCrc() { return calculatedCrc; }
         public boolean isCrcValid() { return crcValid; }
@@ -715,17 +861,19 @@ public final class UltimakerTagCodec {
     public static final class DecodedSpool {
         private final String materialGuid;
         private final String serial;
-        private final BigInteger manufacturingTimestampUnsigned;
+        private final BigInteger timeFieldUnsigned;
+        private final double timeFieldDoubleSeconds;
+        private final String timeFieldRawHex;
         private final int stationId;
         private final String batchCode;
         private final int materialVersion;
         private final int materialCompatibility;
-        private final String materialReservedHex;
+        private final String materialTrailingHex;
         private final List<DecodedStatusRecord> statusRecords;
         private final boolean statusCrcValid;
         private final boolean duplicateStatusMatches;
         private final boolean signaturePresent;
-        private final boolean signatureValid;
+        private final boolean signatureMarkerMatches;
         private final int signatureValue;
         private final String signaturePayloadHex;
         private final int materialRecordCount;
@@ -737,28 +885,39 @@ public final class UltimakerTagCodec {
         private final int readMemoryLength;
 
         private DecodedSpool(String materialGuid, String serial,
-                             BigInteger manufacturingTimestampUnsigned, int stationId,
-                             String batchCode, int materialVersion, int materialCompatibility,
-                             String materialReservedHex, List<DecodedStatusRecord> statusRecords,
-                             boolean statusCrcValid, boolean duplicateStatusMatches,
-                             boolean signaturePresent, boolean signatureValid, int signatureValue,
-                             String signaturePayloadHex, int materialRecordCount,
-                             int signatureRecordCount, List<DecodedNdefRecord> ndefRecords,
-                             boolean tlvWrapped, int ndefOffset, int ndefLength,
-                             int readMemoryLength) {
+                             BigInteger timeFieldUnsigned,
+                             double timeFieldDoubleSeconds,
+                             String timeFieldRawHex,
+                             int stationId, String batchCode,
+                             int materialVersion, int materialCompatibility,
+                             String materialTrailingHex,
+                             List<DecodedStatusRecord> statusRecords,
+                             boolean statusCrcValid,
+                             boolean duplicateStatusMatches,
+                             boolean signaturePresent,
+                             boolean signatureMarkerMatches,
+                             int signatureValue,
+                             String signaturePayloadHex,
+                             int materialRecordCount,
+                             int signatureRecordCount,
+                             List<DecodedNdefRecord> ndefRecords,
+                             boolean tlvWrapped, int ndefOffset,
+                             int ndefLength, int readMemoryLength) {
             this.materialGuid = materialGuid;
             this.serial = serial;
-            this.manufacturingTimestampUnsigned = manufacturingTimestampUnsigned;
+            this.timeFieldUnsigned = timeFieldUnsigned;
+            this.timeFieldDoubleSeconds = timeFieldDoubleSeconds;
+            this.timeFieldRawHex = timeFieldRawHex;
             this.stationId = stationId;
             this.batchCode = batchCode;
             this.materialVersion = materialVersion;
             this.materialCompatibility = materialCompatibility;
-            this.materialReservedHex = materialReservedHex;
+            this.materialTrailingHex = materialTrailingHex;
             this.statusRecords = statusRecords;
             this.statusCrcValid = statusCrcValid;
             this.duplicateStatusMatches = duplicateStatusMatches;
             this.signaturePresent = signaturePresent;
-            this.signatureValid = signatureValid;
+            this.signatureMarkerMatches = signatureMarkerMatches;
             this.signatureValue = signatureValue;
             this.signaturePayloadHex = signaturePayloadHex;
             this.materialRecordCount = materialRecordCount;
@@ -770,32 +929,97 @@ public final class UltimakerTagCodec {
             this.readMemoryLength = readMemoryLength;
         }
 
-        private DecodedStatusRecord firstStatus() {
-            return statusRecords.get(0);
+        private DecodedStatusRecord activeStatus() {
+            DecodedStatusRecord active = null;
+
+            // Prefer valid records. Highest usage wins; equal usage keeps the
+            // earlier record, matching Python max() over the original order.
+            for (DecodedStatusRecord status : statusRecords) {
+                if (!status.isCrcValid()) {
+                    continue;
+                }
+                if (active == null || status.getTotalUsageDurationSecondsUnsigned()
+                        .compareTo(active.getTotalUsageDurationSecondsUnsigned()) > 0) {
+                    active = status;
+                }
+            }
+
+            if (active != null) {
+                return active;
+            }
+
+            // Diagnostic fallback if all CRCs are invalid.
+            active = statusRecords.get(0);
+            for (int index = 1; index < statusRecords.size(); index++) {
+                DecodedStatusRecord candidate = statusRecords.get(index);
+                if (candidate.getTotalUsageDurationSecondsUnsigned()
+                        .compareTo(active.getTotalUsageDurationSecondsUnsigned()) > 0) {
+                    active = candidate;
+                }
+            }
+            return active;
         }
 
         public String getMaterialGuid() { return materialGuid; }
         public String getSerial() { return serial; }
-        public long getManufacturingTimestamp() { return manufacturingTimestampUnsigned.longValue(); }
-        public BigInteger getManufacturingTimestampUnsigned() { return manufacturingTimestampUnsigned; }
+        public BigInteger getTimeFieldUnsigned() { return timeFieldUnsigned; }
+        public double getTimeFieldDoubleSeconds() { return timeFieldDoubleSeconds; }
+        public String getTimeFieldRawHex() { return timeFieldRawHex; }
         public int getStationId() { return stationId; }
         public String getBatchCode() { return batchCode; }
         public int getMaterialVersion() { return materialVersion; }
         public int getMaterialCompatibility() { return materialCompatibility; }
-        public String getMaterialReservedHex() { return materialReservedHex; }
-        public int getStatusVersion() { return firstStatus().getVersion(); }
-        public int getStatusCompatibility() { return firstStatus().getCompatibility(); }
-        public int getUnit() { return firstStatus().getUnit(); }
-        public long getTotalAmount() { return firstStatus().getTotalAmount(); }
-        public long getRemainingAmount() { return firstStatus().getRemainingAmount(); }
-        public long getTotalUsageDurationSeconds() { return firstStatus().getTotalUsageDurationSeconds(); }
-        public BigInteger getTotalUsageDurationSecondsUnsigned() {
-            return firstStatus().getTotalUsageDurationSecondsUnsigned();
+        public String getMaterialTrailingHex() { return materialTrailingHex; }
+
+        public boolean isSpoolMakerTag() {
+            if (stationId != DEFAULT_STATION_ID || materialTrailingHex == null
+                    || materialTrailingHex.length() < 4) {
+                return false;
+            }
+            try {
+                int marker = Integer.parseInt(materialTrailingHex.substring(0, 2), 16);
+                return marker == SPOOLMAKER_DATE_MARKER;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
         }
+
+        public DateMeaning getDateMeaning() {
+            if (!isSpoolMakerTag()) {
+                return DateMeaning.NONE;
+            }
+            try {
+                int code = Integer.parseInt(materialTrailingHex.substring(2, 4), 16);
+                return DateMeaning.fromCode(code);
+            } catch (NumberFormatException ignored) {
+                return DateMeaning.NONE;
+            }
+        }
+
+        public boolean hasSpoolMakerDate() {
+            return isSpoolMakerTag()
+                    && getDateMeaning() != DateMeaning.NONE
+                    && Double.isFinite(timeFieldDoubleSeconds)
+                    && timeFieldDoubleSeconds > 0.0d;
+        }
+
+        public int getActiveStatusRecordIndex() { return activeStatus().getIndex(); }
+        public int getStatusVersion() { return activeStatus().getVersion(); }
+        public int getStatusCompatibility() { return activeStatus().getCompatibility(); }
+        public int getUnit() { return activeStatus().getUnit(); }
+        public long getTotalAmount() { return activeStatus().getTotalAmount(); }
+        public long getRemainingAmount() { return activeStatus().getRemainingAmount(); }
+        public long getTotalUsageDurationSeconds() {
+            return activeStatus().getTotalUsageDurationSeconds();
+        }
+        public BigInteger getTotalUsageDurationSecondsUnsigned() {
+            return activeStatus().getTotalUsageDurationSecondsUnsigned();
+        }
+
         public boolean isStatusCrcValid() { return statusCrcValid; }
         public boolean isDuplicateStatusMatches() { return duplicateStatusMatches; }
         public boolean isSignaturePresent() { return signaturePresent; }
-        public boolean isSignatureValid() { return signatureValid; }
+        public boolean hasExpectedSigMarker() { return signatureMarkerMatches; }
         public int getSignatureValue() { return signatureValue; }
         public String getSignaturePayloadHex() { return signaturePayloadHex; }
         public int getStatusRecordCount() { return statusRecords.size(); }

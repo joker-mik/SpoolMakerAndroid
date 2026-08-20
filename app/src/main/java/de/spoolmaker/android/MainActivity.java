@@ -3,6 +3,7 @@ package de.spoolmaker.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -53,9 +54,11 @@ import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 public final class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
     private static final int REQUEST_IMPORT_MATERIAL = 1401;
@@ -119,6 +122,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private volatile MaterialProfile pendingWriteMaterial;
     private volatile long pendingWriteTotalWeightMg;
     private volatile long pendingWriteRemainingWeightMg;
+    private volatile UltimakerTagCodec.DateMeaning pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+    private volatile long pendingWriteDateEpochSeconds;
 
     private String lastDetailsText = "";
     private String lastRawDumpText = "";
@@ -290,10 +295,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         MaterialProfile writeMaterial = pendingWriteMaterial;
         long writeTotalWeightMg = pendingWriteTotalWeightMg;
         long writeRemainingWeightMg = pendingWriteRemainingWeightMg;
+        UltimakerTagCodec.DateMeaning writeDateMeaning = pendingWriteDateMeaning;
+        long writeDateEpochSeconds = pendingWriteDateEpochSeconds;
         pendingAction = PendingAction.NONE;
         pendingWriteMaterial = null;
         pendingWriteTotalWeightMg = 0;
         pendingWriteRemainingWeightMg = 0;
+        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+        pendingWriteDateEpochSeconds = 0;
 
         String uid = NtagIo.formatUid(tag);
         runOnUiThread(() -> setStatus("NFC-Tag " + uid + " erkannt. Verarbeitung l\u00e4uft ..."));
@@ -315,7 +324,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             }
 
             byte[] encoded = UltimakerTagCodec.encodeSpool(
-                    writeMaterial.getGuid(), uid, writeTotalWeightMg, writeRemainingWeightMg);
+                    writeMaterial.getGuid(), uid,
+                    writeTotalWeightMg, writeRemainingWeightMg,
+                    writeDateMeaning, writeDateEpochSeconds);
             NtagIo.writeUserMemory(tag, encoded);
 
             byte[] verification = NtagIo.readUserMemory(tag, READ_BYTES);
@@ -328,7 +339,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (!decoded.getMaterialGuid().equals(writeMaterial.getGuid())
                     || decoded.getTotalAmount() != writeTotalWeightMg
                     || decoded.getRemainingAmount() != writeRemainingWeightMg
-                    || !decoded.isStatusCrcValid()) {
+                    || !decoded.isStatusCrcValid()
+                    || !UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())
+                    || !decoded.isSpoolMakerTag()
+                    || decoded.getDateMeaning() != writeDateMeaning
+                    || (writeDateMeaning != UltimakerTagCodec.DateMeaning.NONE
+                    && Math.round(decoded.getTimeFieldDoubleSeconds()) != writeDateEpochSeconds)) {
                 throw new IOException("Der Tag wurde gelesen, aber die Inhaltspr\u00fcfung ist fehlgeschlagen.");
             }
 
@@ -869,6 +885,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         pendingWriteMaterial = null;
         pendingWriteTotalWeightMg = 0;
         pendingWriteRemainingWeightMg = 0;
+        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+        pendingWriteDateEpochSeconds = 0;
         pendingAction = PendingAction.READ;
         setStatus("Lesen ist aktiviert.");
         showNfcPrompt(false);
@@ -902,24 +920,111 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             return;
         }
 
+        showWriteConfirmation(profile, totalWeightMg, remainingWeightMg);
+    }
+
+    private void showWriteConfirmation(MaterialProfile profile, long totalWeightMg,
+                                       long remainingWeightMg) {
         String message = profile.getDisplayName() + "\n"
                 + profile.getGuid() + "\n\n"
                 + "Gesamtmenge: " + formatWeight(totalWeightMg) + "\n"
                 + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n\n"
+                + "Neue SpoolMaker-Tags speichern eine Datumsart in den beiden von S5/S8 "
+                + "nicht ausgewerteten Materialbytes. Das Zeitfeld wird als Unix-Sekunden/Double gespeichert.\n\n"
                 + "Der vorhandene Spuleninhalt wird ueberschrieben. Gesperrte Tags koennen nicht beschrieben werden.";
+
+        UltimakerTagCodec.DateMeaning[] meanings = new UltimakerTagCodec.DateMeaning[]{
+                UltimakerTagCodec.DateMeaning.NONE,
+                UltimakerTagCodec.DateMeaning.MANUFACTURED,
+                UltimakerTagCodec.DateMeaning.PURCHASED,
+                UltimakerTagCodec.DateMeaning.OPENED,
+                UltimakerTagCodec.DateMeaning.CREATED
+        };
+        String[] labels = new String[]{
+                "Kein eigenes Datum",
+                "Herstellungsdatum",
+                "Kaufdatum",
+                "Geoeffnet am",
+                "Spule angelegt am"
+        };
+        Calendar selectedDate = Calendar.getInstance();
+
+        LinearLayout options = new LinearLayout(this);
+        options.setOrientation(LinearLayout.VERTICAL);
+        options.setPadding(dp(24), 0, dp(24), 0);
+
+        TextView dateLabel = new TextView(this);
+        dateLabel.setText("Filament-Datum");
+        dateLabel.setTextColor(getColor(R.color.text_primary));
+        dateLabel.setTypeface(null, Typeface.BOLD);
+
+        Spinner dateMeaning = new Spinner(this);
+        ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        dateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        dateMeaning.setAdapter(dateAdapter);
+        dateMeaning.setSelection(3); // Geoeffnet am
+
+        Button dateButton = new Button(this);
+        updateDateButton(dateButton, selectedDate);
+        dateMeaning.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                dateButton.setEnabled(meanings[position] != UltimakerTagCodec.DateMeaning.NONE);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                dateButton.setEnabled(false);
+            }
+        });
+        dateButton.setOnClickListener(view -> new DatePickerDialog(
+                this,
+                (picker, year, month, day) -> {
+                    selectedDate.set(Calendar.YEAR, year);
+                    selectedDate.set(Calendar.MONTH, month);
+                    selectedDate.set(Calendar.DAY_OF_MONTH, day);
+                    updateDateButton(dateButton, selectedDate);
+                },
+                selectedDate.get(Calendar.YEAR),
+                selectedDate.get(Calendar.MONTH),
+                selectedDate.get(Calendar.DAY_OF_MONTH)).show());
+
+        options.addView(dateLabel);
+        options.addView(dateMeaning);
+        options.addView(dateButton);
+
         new AlertDialog.Builder(this)
                 .setTitle("NFC-Tag schreiben?")
                 .setMessage(message)
+                .setView(options)
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Schreiben aktivieren", (dialog, which) -> {
+                    UltimakerTagCodec.DateMeaning meaning = meanings[dateMeaning.getSelectedItemPosition()];
                     pendingWriteMaterial = profile;
                     pendingWriteTotalWeightMg = totalWeightMg;
                     pendingWriteRemainingWeightMg = remainingWeightMg;
+                    pendingWriteDateMeaning = meaning;
+                    pendingWriteDateEpochSeconds = meaning == UltimakerTagCodec.DateMeaning.NONE
+                            ? 0L : toUtcDateEpochSeconds(selectedDate);
                     pendingAction = PendingAction.WRITE;
                     setStatus("Schreiben ist aktiviert.");
                     showNfcPrompt(true);
                 })
                 .show();
+    }
+
+    private void updateDateButton(Button button, Calendar date) {
+        button.setText(DateFormat.getDateInstance(DateFormat.MEDIUM).format(date.getTime()));
+    }
+
+    private long toUtcDateEpochSeconds(Calendar selectedDate) {
+        Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        utc.clear();
+        utc.set(selectedDate.get(Calendar.YEAR),
+                selectedDate.get(Calendar.MONTH),
+                selectedDate.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+        return utc.getTimeInMillis() / 1000L;
     }
 
     private boolean ensureNfcReady() {
@@ -965,6 +1070,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         pendingWriteMaterial = null;
         pendingWriteTotalWeightMg = 0;
         pendingWriteRemainingWeightMg = 0;
+        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+        pendingWriteDateEpochSeconds = 0;
         if (updateStatus) {
             setStatus("NFC-Aktion wurde abgebrochen.");
         }
@@ -1019,8 +1126,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + formatAmount(decoded.getTotalAmount(), decoded.getUnit()) + ", verbleibend "
                 + formatAmount(decoded.getRemainingAmount(), decoded.getUnit()));
 
-        textTimestamp.setText(getString(R.string.label_timestamp) + ": Herstellung "
-                + formatManufacturingTimestamp(decoded.getManufacturingTimestampUnsigned())
+        textTimestamp.setText(getString(R.string.label_timestamp) + ": "
+                + formatMaterialDate(decoded)
+                + formatCustomDateAgeSuffix(decoded)
                 + ", Nutzungsdauer "
                 + formatDuration(decoded.getTotalUsageDurationSecondsUnsigned()));
         textBatch.setText(getString(R.string.label_batch) + ": " + decoded.getBatchCode());
@@ -1028,13 +1136,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + String.format(Locale.US, "%04X", decoded.getStationId())
                 + " (" + decoded.getStationId() + ")");
 
+        boolean uidMatches = UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial());
         boolean integrityOk = decoded.isStatusCrcValid()
-                && decoded.isDuplicateStatusMatches()
-                && decoded.isSignatureValid();
+                && uidMatches
+                && decoded.getMaterialRecordCount() == 1
+                && decoded.getStatusRecordCount() == 2;
         String integrity = "CRC-8 " + (decoded.isStatusCrcValid() ? "gueltig" : "UNGUELTIG")
-                + ", Statuskopien " + (decoded.isDuplicateStatusMatches() ? "identisch" : "abweichend")
-                + ", Signatur " + (decoded.isSignatureValid() ? "0x2000 gueltig" : "fehlt/abweichend")
-                + " (" + decoded.getStatusRecordCount() + " Statusrecords)";
+                + ", aktiv Status " + decoded.getActiveStatusRecordIndex()
+                + ", UID/Serial " + (uidMatches ? "OK" : "ABWEICHEND")
+                + ", Statusrecords " + decoded.getStatusRecordCount()
+                + (decoded.isDuplicateStatusMatches() ? " (bytegleich)" : " (unterschiedlich, normal moeglich)")
+                + ", Sig-Marker " + (decoded.hasExpectedSigMarker() ? "0x2000" : "fehlt/abweichend");
         textCrc.setText(getString(R.string.label_crc) + ": " + integrity);
         textCrc.setTextColor(getColor(integrityOk ? R.color.accent_dark : R.color.danger));
 
@@ -1070,15 +1182,23 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         appendValue(out, "Formatversion", Integer.toString(decoded.getMaterialVersion()));
         appendValue(out, "Kompatibilitaetsversion", Integer.toString(decoded.getMaterialCompatibility()));
         appendValue(out, "Seriennummer (14-Byte-Feld)", emptyAsMarker(decoded.getSerial()));
-        appendValue(out, "Herstellungszeitpunkt roh", decoded.getManufacturingTimestampUnsigned().toString());
-        appendValue(out, "Herstellungszeitpunkt interpretiert",
-                formatManufacturingTimestamp(decoded.getManufacturingTimestampUnsigned()));
+        appendValue(out, "Zeitfeld roh (Hex)", decoded.getTimeFieldRawHex());
+        appendValue(out, "Zeitfeld roh (uint64)", decoded.getTimeFieldUnsigned().toString());
+        appendValue(out, "Zeitfeld als BE IEEE-754 double",
+                formatDoubleSeconds(decoded.getTimeFieldDoubleSeconds()));
+        appendValue(out, "Zeitfeld interpretiert", formatMaterialDate(decoded));
+        appendValue(out, "SpoolMaker-Tagformat", yesNo(decoded.isSpoolMakerTag()));
+        appendValue(out, "SpoolMaker-Datumsart", decoded.isSpoolMakerTag()
+                ? dateMeaningLabel(decoded.getDateMeaning()) : "Originaltag / nicht gesetzt");
+        if (decoded.hasSpoolMakerDate()) {
+            appendValue(out, "Alter seit Datum", formatCustomDateAge(decoded));
+        }
         appendValue(out, "Material-GUID", decoded.getMaterialGuid());
         appendValue(out, "Programmierstations-ID", "0x"
                 + String.format(Locale.US, "%04X", decoded.getStationId())
                 + " (" + decoded.getStationId() + ")");
         appendValue(out, "Batchcode (64-Byte-Feld)", emptyAsMarker(decoded.getBatchCode()));
-        appendValue(out, "Reservierte Bytes [106..107]", decoded.getMaterialReservedHex());
+        appendValue(out, "Trailing/unknown Bytes [106..107]", decoded.getMaterialTrailingHex());
 
         appendHeading(out, "SIGNATURRECORD");
         appendValue(out, "Vorhanden", yesNo(decoded.isSignaturePresent()));
@@ -1087,10 +1207,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 ? "nicht als 16-Bit-Wert lesbar"
                 : "0x" + String.format(Locale.US, "%04X", decoded.getSignatureValue())
                 + " (" + decoded.getSignatureValue() + ")");
-        appendValue(out, "Erwarteter Wert 0x2000", yesNo(decoded.isSignatureValid()));
+        appendValue(out, "Sig-Marker entspricht 0x2000", yesNo(decoded.hasExpectedSigMarker()));
 
         for (UltimakerTagCodec.DecodedStatusRecord status : decoded.getStatusRecords()) {
-            appendHeading(out, "STATUSRECORD " + status.getIndex());
+            appendHeading(out, "STATUSRECORD " + status.getIndex()
+                    + (status.getIndex() == decoded.getActiveStatusRecordIndex() ? " (AKTIV)" : ""));
             appendValue(out, "Formatversion", Integer.toString(status.getVersion()));
             appendValue(out, "Kompatibilitaetsversion", Integer.toString(status.getCompatibility()));
             appendValue(out, "Einheit", status.getUnit() + " ("
@@ -1118,8 +1239,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         appendHeading(out, "KONSISTENZ");
         appendValue(out, "Alle Status-CRC gueltig", yesNo(decoded.isStatusCrcValid()));
-        appendValue(out, "Statusrecords bytegleich", yesNo(decoded.isDuplicateStatusMatches()));
-        appendValue(out, "Signatur 0x2000 gueltig", yesNo(decoded.isSignatureValid()));
+        appendValue(out, "Aktiver Statusrecord", Integer.toString(decoded.getActiveStatusRecordIndex()));
+        appendValue(out, "Statusrecords bytegleich (nur Information)", yesNo(decoded.isDuplicateStatusMatches()));
+        appendValue(out, "UID entspricht Serienfeld",
+                yesNo(UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())));
+        appendValue(out, "Sig-Marker 0x2000 vorhanden", yesNo(decoded.hasExpectedSigMarker()));
 
         appendHeading(out, "ALLE NDEF-RECORDS");
         for (UltimakerTagCodec.DecodedNdefRecord record : decoded.getNdefRecords()) {
@@ -1264,17 +1388,86 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         return grams + " g (" + milligrams + " mg)";
     }
 
-    private String formatManufacturingTimestamp(BigInteger epochSeconds) {
-        if (epochSeconds.signum() == 0) {
-            return "nicht gesetzt (0)";
+    private String formatMaterialDate(UltimakerTagCodec.DecodedSpool decoded) {
+        double seconds = decoded.getTimeFieldDoubleSeconds();
+        if (decoded.isSpoolMakerTag()) {
+            if (!decoded.hasSpoolMakerDate()) {
+                return "SpoolMaker: kein Datum gespeichert";
+            }
+            return dateMeaningLabel(decoded.getDateMeaning()) + ": "
+                    + formatEpochSeconds(seconds, true);
         }
-        BigInteger maxSeconds = BigInteger.valueOf(Long.MAX_VALUE / 1000L);
-        if (epochSeconds.compareTo(maxSeconds) > 0) {
-            return epochSeconds + " (ausserhalb des Android-Datumsbereichs)";
+        return "UltiMaker-Zeitfeld: " + formatEpochSeconds(seconds, false)
+                + " (als BE-double/Unix-Sekunden interpretiert)";
+    }
+
+    private String formatEpochSeconds(double seconds, boolean dateOnly) {
+        if (!Double.isFinite(seconds)) {
+            return "nicht als endliche IEEE-754-Zahl interpretierbar";
         }
-        Date date = new Date(epochSeconds.longValue() * 1000L);
-        return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM)
-                .format(date) + " (Unix " + epochSeconds + ")";
+        double millis = seconds * 1000.0d;
+        if (!Double.isFinite(millis) || millis > Long.MAX_VALUE || millis < Long.MIN_VALUE) {
+            return formatDoubleSeconds(seconds) + " (ausserhalb des Android-Datumsbereichs)";
+        }
+        Date date = new Date(Math.round(millis));
+        DateFormat formatter = dateOnly
+                ? DateFormat.getDateInstance(DateFormat.MEDIUM)
+                : DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM);
+        if (dateOnly) {
+            formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        }
+        return formatter.format(date) + " (Unix-double " + formatDoubleSeconds(seconds) + ")";
+    }
+
+    private String formatDoubleSeconds(double seconds) {
+        if (!Double.isFinite(seconds)) {
+            return Double.toString(seconds);
+        }
+        return BigDecimal.valueOf(seconds).stripTrailingZeros().toPlainString() + " s";
+    }
+
+    private String dateMeaningLabel(UltimakerTagCodec.DateMeaning meaning) {
+        if (meaning == null) {
+            return "Unbekanntes Datum";
+        }
+        switch (meaning) {
+            case MANUFACTURED: return "Herstellungsdatum";
+            case PURCHASED: return "Kaufdatum";
+            case OPENED: return "Geoeffnet am";
+            case CREATED: return "Spule angelegt am";
+            default: return "Kein eigenes Datum";
+        }
+    }
+
+    private String formatCustomDateAgeSuffix(UltimakerTagCodec.DecodedSpool decoded) {
+        if (!decoded.hasSpoolMakerDate()) {
+            return "";
+        }
+        return ", " + formatCustomDateAge(decoded);
+    }
+
+    private String formatCustomDateAge(UltimakerTagCodec.DecodedSpool decoded) {
+        double seconds = decoded.getTimeFieldDoubleSeconds();
+        if (!Double.isFinite(seconds)) {
+            return "Alter nicht berechenbar";
+        }
+        double millisDouble = seconds * 1000.0d;
+        if (!Double.isFinite(millisDouble) || millisDouble > Long.MAX_VALUE
+                || millisDouble < Long.MIN_VALUE) {
+            return "Alter nicht berechenbar";
+        }
+        Calendar localToday = Calendar.getInstance();
+        Calendar utcToday = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        utcToday.clear();
+        utcToday.set(localToday.get(Calendar.YEAR),
+                localToday.get(Calendar.MONTH),
+                localToday.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+        long deltaMillis = utcToday.getTimeInMillis() - Math.round(millisDouble);
+        if (deltaMillis < 0) {
+            return "Datum liegt in der Zukunft";
+        }
+        long days = deltaMillis / 86_400_000L;
+        return "Alter seit Datum: " + days + (days == 1 ? " Tag" : " Tage");
     }
 
     private String formatDuration(BigInteger seconds) {
