@@ -48,8 +48,21 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD secret is missing"; exit 1; }
           test -n "$ANDROID_KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS secret is missing"; exit 1; }
           test -n "$ANDROID_KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD secret is missing"; exit 1; }
-
+      
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release-key.p12
+      
+          echo "SHA256 des rekonstruierten Keystores:"
+          sha256sum release-key.p12
+      
+          echo "Teste Keystore-Passwort direkt mit keytool..."
+          keytool -list \
+            -storetype PKCS12 \
+            -keystore release-key.p12 \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            >/dev/null
+      
+          echo "Keystore-Passwort wurde erfolgreich akzeptiert."
+      
           cat > signing.properties <<PROPS
           storeFile=../release-key.p12
           storePassword=$ANDROID_KEYSTORE_PASSWORD
