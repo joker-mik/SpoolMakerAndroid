@@ -634,9 +634,79 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             showLicensePage();
         });
         findViewById(R.id.buttonPageBack).setOnClickListener(view -> closeSecondaryPage());
+        configureDrawerAppearance();
         tabRead.setOnClickListener(view -> selectTab(true));
         tabWrite.setOnClickListener(view -> selectTab(false));
         selectTab(true);
+    }
+
+    private void configureDrawerAppearance() {
+        View materialsEntry = findViewById(R.id.menuMaterials);
+        if (materialsEntry instanceof TextView) {
+            TextView materialsText = (TextView) materialsEntry;
+            materialsText.setText("Materialbibliothek");
+            materialsText.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    R.drawable.ic_database, 0, 0, 0);
+        } else {
+            TextView materialsText = findFirstTextView(materialsEntry);
+            if (materialsText != null) {
+                materialsText.setText("Materialbibliothek");
+            }
+            ImageView materialsIcon = findFirstImageView(materialsEntry);
+            if (materialsIcon != null) {
+                materialsIcon.setImageResource(R.drawable.ic_database);
+            }
+        }
+
+        TextView version = findViewById(R.id.textDrawerVersion);
+        if (version != null) {
+            version.setText("Version " + BuildConfig.VERSION_NAME);
+            version.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
+            version.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
+            android.view.ViewGroup.LayoutParams params = version.getLayoutParams();
+            if (params != null) {
+                params.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
+                version.setLayoutParams(params);
+            }
+        }
+    }
+
+    private TextView findFirstTextView(View root) {
+        if (root == null) {
+            return null;
+        }
+        if (root instanceof TextView) {
+            return (TextView) root;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                TextView result = findFirstTextView(group.getChildAt(index));
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+        return null;
+    }
+
+    private ImageView findFirstImageView(View root) {
+        if (root == null) {
+            return null;
+        }
+        if (root instanceof ImageView) {
+            return (ImageView) root;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                ImageView result = findFirstImageView(group.getChildAt(index));
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+        return null;
     }
 
     private void selectTab(boolean read) {
@@ -683,17 +753,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
         textPageBody.setText(
                 "Spool Maker Android " + BuildConfig.VERSION_NAME + "\n\n"
-                        + "Diese App liest und schreibt UltiMaker-kompatible NFC-Spulentags "
-                        + "und verwaltet die zugehörigen Materialprofile lokal auf dem Smartphone.\n\n"
-                        + "Quelle / technische Grundlage\n"
-                        + "Das NFC-Spulenformat und die grundlegende Umsetzung orientieren sich am "
-                        + "Open-Source-Projekt Spool-Maker von DA-Osborne. Diese Android-App ist eine "
-                        + "eigenständige Portierung und Weiterentwicklung und kein offizielles Produkt "
-                        + "von UltiMaker oder DA-Osborne.\n\n"
-                        + "https://github.com/DA-Osborne/Spool-Maker\n\n"
-                        + "Die Materialdateien werden beim Import ausgewertet. Hersteller, Material, "
-                        + "Farbe, GUID und – sofern vorhanden – das Spulengewicht werden anschließend "
-                        + "im privaten App-Speicher abgelegt; die Quelldatei wird danach nicht mehr benötigt.");
+                        + "Mit dieser App können UltiMaker-kompatible NFC-Spulentags gelesen und "
+                        + "beschrieben sowie Materialprofile und Restmengen verwaltet werden.\n\n"
+                        + "Bevor ein Tag geschrieben werden kann, muss das gewünschte Material zunächst "
+                        + "über eine Cura-Materialdatei importiert werden. Die App übernimmt daraus "
+                        + "Materialname, Farbe, GUID und – sofern vorhanden – das Spulengewicht. Danach "
+                        + "steht das Material in der Materialbibliothek zur Auswahl.\n\n"
+                        + "Projekt / Quellcode\n"
+                        + "https://github.com/joker-mik/SpoolMakerAndroid\n\n"
+                        + "Kein offizielles UltiMaker-Produkt.");
         Linkify.addLinks(textPageBody, Linkify.WEB_URLS);
         textPageBody.setMovementMethod(LinkMovementMethod.getInstance());
         secondaryPage.setVisibility(View.VISIBLE);
@@ -1514,18 +1582,18 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (!decoded.hasSpoolMakerDate()) {
             return "";
         }
-        return ", " + formatCustomDateAge(decoded);
+        return ", Alter seit Datum: " + formatCustomDateAge(decoded);
     }
 
     private String formatCustomDateAge(UltimakerTagCodec.DecodedSpool decoded) {
         double seconds = decoded.getTimeFieldDoubleSeconds();
         if (!Double.isFinite(seconds)) {
-            return "Alter nicht berechenbar";
+            return "nicht berechenbar";
         }
         double millisDouble = seconds * 1000.0d;
         if (!Double.isFinite(millisDouble) || millisDouble > Long.MAX_VALUE
                 || millisDouble < Long.MIN_VALUE) {
-            return "Alter nicht berechenbar";
+            return "nicht berechenbar";
         }
         Calendar localToday = Calendar.getInstance();
         Calendar utcToday = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
@@ -1538,7 +1606,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             return "Datum liegt in der Zukunft";
         }
         long days = deltaMillis / 86_400_000L;
-        return "Alter seit Datum: " + days + (days == 1 ? " Tag" : " Tage");
+        return days + (days == 1 ? " Tag" : " Tage");
     }
 
     private String formatDuration(BigInteger seconds) {
@@ -1589,14 +1657,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void showAboutDialog() {
         String message = "Spool Maker Android " + BuildConfig.VERSION_NAME + "\n\n"
-                + "Android-Port des GPL-3.0-Projekts Spool Maker von DA-Osborne. "
-                + "Die App nutzt die NFC-Hardware des Smartphones statt eines ACR122U-USB-Lesers.\n\n"
-                + "Diese Version zeigt alle dekodierten Material-, Signatur- und Statusfelder, beide Statuskopien, alle NDEF-Records sowie einen vollstaendigen Hexdump des NTAG216-Benutzerspeichers.\n\n"
-                + "Kein offizielles Ultimaker-Produkt. Vor dem Einsatz mit wertvollen oder gesperrten Tags zuerst mit einem Testtag pr\u00fcfen.";
+                + "Liest und schreibt UltiMaker-kompatible NFC-Spulentags und verwaltet "
+                + "Materialprofile und Restmengen. Vor dem Schreiben muss das gewünschte "
+                + "Material über eine Cura-Materialdatei importiert werden.\n\n"
+                + "https://github.com/joker-mik/SpoolMakerAndroid\n\n"
+                + "Kein offizielles UltiMaker-Produkt.";
         new AlertDialog.Builder(this)
                 .setTitle("Info")
                 .setMessage(message)
-                .setNegativeButton("Schlie\u00dfen", null)
+                .setNegativeButton("Schließen", null)
                 .setNeutralButton("GPL-3.0 anzeigen", (dialog, which) -> showLicenseDialog())
                 .show();
     }
