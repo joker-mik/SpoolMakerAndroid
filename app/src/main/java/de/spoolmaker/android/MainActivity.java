@@ -544,17 +544,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             }
         });
 
-        TextView hint = new TextView(this);
-        hint.setText("Das gewählte Datum wird auf neu erstellten SpoolMaker-Tags gespeichert.");
-        hint.setTextColor(getColor(R.color.text_secondary));
-        hint.setTextSize(13f);
-        hint.setPadding(0, dp(4), 0, 0);
-
         dateSection.addView(dateMeaningLabel);
         dateSection.addView(spinnerWriteDateMeaning);
         dateSection.addView(dateLabel);
         dateSection.addView(buttonWriteDate);
-        dateSection.addView(hint);
 
         int insertIndex = parent.indexOfChild(editRemainingWeightGrams) + 1;
         parent.addView(dateSection, insertIndex, sectionParams);
@@ -788,7 +781,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         materialList.removeAllViews();
         if (materials.isEmpty()) {
             TextView empty = new TextView(this);
-            empty.setText("Noch keine Materialien gespeichert.\nÜber + anlegen oder eine Cura-Materialdatei importieren.");
+            empty.setText(R.string.materials_empty);
             empty.setTextColor(getColor(R.color.text_secondary));
             empty.setTextSize(16f);
             empty.setPadding(dp(8), dp(20), dp(8), dp(20));

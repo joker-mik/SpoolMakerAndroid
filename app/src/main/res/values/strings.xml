@@ -15,7 +15,7 @@
     <string name="button_read">Tag lesen</string>
     <string name="button_write">Tag schreiben</string>
     <string name="button_details">Alle gespeicherten Werte</string>
-    <string name="button_import">Cura-Materialdatei importieren</string>
+    <string name="button_import">Materialdateien importieren</string>
     <string name="button_copy_details">Details kopieren</string>
     <string name="button_show_raw">Rohdaten anzeigen</string>
     <string name="button_hide_raw">Rohdaten ausblenden</string>
@@ -46,6 +46,8 @@
     <string name="content_add">Material hinzuf&#252;gen</string>
     <string name="content_edit">Material bearbeiten</string>
     <string name="content_delete">Material l&#246;schen</string>
+    <string name="content_import_database">Materialdateien in die Datenbank importieren</string>
+    <string name="materials_empty">Die Materialdatenbank ist leer.\nLege &#252;ber + ein Material an oder importiere Materialdateien &#252;ber das Import-Symbol.</string>
 
     <string name="read_page_result">Ergebnis</string>
     <string name="read_page_details">Alle Werte</string>
