@@ -63,12 +63,39 @@ jobs:
       
           echo "Keystore-Passwort wurde erfolgreich akzeptiert."
       
-          cat > signing.properties <<PROPS
-          storeFile=../release-key.p12
-          storePassword=$ANDROID_KEYSTORE_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          keyPassword=$ANDROID_KEY_PASSWORD
-          PROPS
+          cat > /tmp/CreateSigningProperties.java <<'JAVA'
+          import java.io.FileOutputStream;
+          import java.util.Properties;
+
+          public class CreateSigningProperties {
+              public static void main(String[] args) throws Exception {
+                  Properties p = new Properties();
+
+                  p.setProperty("storeFile", "../release-key.p12");
+                  p.setProperty(
+                      "storePassword",
+                      System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                  );
+                  p.setProperty(
+                      "keyAlias",
+                      System.getenv("ANDROID_KEY_ALIAS")
+                  );
+                  p.setProperty(
+                      "keyPassword",
+                      System.getenv("ANDROID_KEY_PASSWORD")
+                  );
+
+                  try (FileOutputStream out =
+                           new FileOutputStream("signing.properties")) {
+                      p.store(out, null);
+                  }
+              }
+          }
+          JAVA
+
+          java /tmp/CreateSigningProperties.java
+
+          echo "signing.properties wurde sicher erzeugt."
 
       - name: Build signed release APK
         shell: bash
