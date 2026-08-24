@@ -111,129 +111,309 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <ScrollView
+            <de.spoolmaker.android.ui.ReadGalleryLayout
                 android:id="@+id/readPage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:fillViewport="true"
+                android:orientation="vertical"
                 android:paddingStart="16dp"
                 android:paddingTop="18dp"
                 android:paddingEnd="16dp"
-                android:paddingBottom="18dp">
+                android:paddingBottom="4dp">
 
-                <LinearLayout
+                <FrameLayout
+                    android:id="@+id/readGalleryViewport"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipChildren="true"
+                    android:clipToPadding="true">
 
-                    <LinearLayout
-                        android:id="@+id/scanCard"
+                    <ScrollView
+                        android:id="@+id/readGalleryResultPage"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_card"
-                        android:orientation="vertical">
+                        android:layout_height="match_parent"
+                        android:fillViewport="true">
 
-                        <TextView
+                        <LinearLayout
+                            android:id="@+id/scanCard"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/section_scan"
-                            android:textColor="@color/text_primary"
-                            android:textSize="24sp"
-                            android:textStyle="bold" />
+                            android:background="@drawable/bg_card"
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/textScanEmpty"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:text="@string/scan_empty"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="16sp" />
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
 
-                        <TextView android:id="@+id/textUid" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="@color/text_primary" android:textIsSelectable="true" />
-                        <TextView android:id="@+id/textGuid" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" android:textIsSelectable="true" />
-                        <TextView android:id="@+id/textMaterialResult" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                        <TextView android:id="@+id/textWeightResult" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                        <TextView android:id="@+id/textTimestamp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                        <TextView android:id="@+id/textBatch" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                        <TextView android:id="@+id/textStation" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                        <TextView android:id="@+id/textCrc" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:textColor="@color/text_primary" />
-                    </LinearLayout>
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/read_page_result"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="24sp"
+                                    android:textStyle="bold" />
 
-                    <Button
-                        android:id="@+id/buttonDetails"
+                                <Button
+                                    android:id="@+id/buttonCopySummary"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="44dp"
+                                    android:minHeight="0dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/button_copy_page"
+                                    android:textAllCaps="false" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/textScanEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="@string/scan_empty"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="16sp" />
+
+                            <TextView
+                                android:id="@+id/textUid"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
+
+                            <TextView
+                                android:id="@+id/textGuid"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
+
+                            <TextView
+                                android:id="@+id/textMaterialResult"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:id="@+id/textWeightResult"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:id="@+id/textTimestamp"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:id="@+id/textBatch"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:id="@+id/textStation"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+
+                            <TextView
+                                android:id="@+id/textCrc"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="7dp"
+                                android:textColor="@color/text_primary" />
+                        </LinearLayout>
+                    </ScrollView>
+
+                    <ScrollView
+                        android:id="@+id/readGalleryDetailsPage"
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:layout_marginTop="14dp"
-                        android:background="@drawable/bg_secondary_button"
-                        android:text="@string/button_details"
-                        android:textColor="@color/text_primary"
-                        android:textSize="16sp" />
-
-                    <LinearLayout
-                        android:id="@+id/detailsPanel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_card"
-                        android:orientation="vertical"
+                        android:layout_height="match_parent"
+                        android:fillViewport="true"
                         android:visibility="gone">
-
-                        <TextView
-                            android:id="@+id/textFullDetails"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
-                            android:text="@string/details_empty"
-                            android:textColor="@color/text_primary"
-                            android:textIsSelectable="true"
-                            android:textSize="12sp" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:orientation="horizontal">
+                            android:background="@drawable/bg_card"
+                            android:orientation="vertical">
 
-                            <Button
-                                android:id="@+id/buttonCopyDetails"
-                                android:layout_width="0dp"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:enabled="false"
-                                android:text="@string/button_copy_details" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
 
-                            <Button
-                                android:id="@+id/buttonToggleRaw"
-                                android:layout_width="0dp"
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/read_page_details"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="24sp"
+                                    android:textStyle="bold" />
+
+                                <Button
+                                    android:id="@+id/buttonCopyDetails"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="44dp"
+                                    android:enabled="false"
+                                    android:minHeight="0dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/button_copy_page"
+                                    android:textAllCaps="false" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/textFullDetails"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:enabled="false"
-                                android:text="@string/button_show_raw" />
+                                android:layout_marginTop="12dp"
+                                android:fontFamily="monospace"
+                                android:text="@string/details_empty"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true"
+                                android:textSize="12sp" />
                         </LinearLayout>
+                    </ScrollView>
 
-                        <Button
-                            android:id="@+id/buttonCopyRaw"
+                    <ScrollView
+                        android:id="@+id/readGalleryRawPage"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fillViewport="true"
+                        android:visibility="gone">
+
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:enabled="false"
-                            android:text="@string/button_copy_raw" />
+                            android:background="@drawable/bg_card"
+                            android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/textRawDump"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:fontFamily="monospace"
-                            android:textColor="@color/text_primary"
-                            android:textIsSelectable="true"
-                            android:textSize="11sp"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/read_page_raw"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="24sp"
+                                    android:textStyle="bold" />
+
+                                <Button
+                                    android:id="@+id/buttonCopyRaw"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="44dp"
+                                    android:enabled="false"
+                                    android:minHeight="0dp"
+                                    android:minWidth="0dp"
+                                    android:text="@string/button_copy_page"
+                                    android:textAllCaps="false" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/textRawDumpVisible"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:fontFamily="monospace"
+                                android:text="@string/raw_empty"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </ScrollView>
+                </FrameLayout>
+
+                <LinearLayout
+                    android:id="@+id/readGalleryDots"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/readGalleryDotResult"
+                        android:layout_width="40dp"
+                        android:layout_height="match_parent"
+                        android:clickable="true"
+                        android:contentDescription="@string/content_gallery_result"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="●"
+                        android:textColor="@color/primary"
+                        android:textSize="17sp" />
+
+                    <TextView
+                        android:id="@+id/readGalleryDotDetails"
+                        android:layout_width="40dp"
+                        android:layout_height="match_parent"
+                        android:alpha="0.45"
+                        android:clickable="true"
+                        android:contentDescription="@string/content_gallery_details"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="●"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
+
+                    <TextView
+                        android:id="@+id/readGalleryDotRaw"
+                        android:layout_width="40dp"
+                        android:layout_height="match_parent"
+                        android:alpha="0.45"
+                        android:clickable="true"
+                        android:contentDescription="@string/content_gallery_raw"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="●"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="17sp" />
                 </LinearLayout>
-            </ScrollView>
+
+                <!-- Compatibility views for the existing MainActivity code. -->
+                <Button
+                    android:id="@+id/buttonDetails"
+                    android:layout_width="1dp"
+                    android:layout_height="1dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/detailsPanel"
+                    android:layout_width="1dp"
+                    android:layout_height="1dp"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/buttonToggleRaw"
+                    android:layout_width="1dp"
+                    android:layout_height="1dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/textRawDump"
+                    android:layout_width="1dp"
+                    android:layout_height="1dp"
+                    android:text="@string/raw_empty"
+                    android:visibility="gone" />
+            </de.spoolmaker.android.ui.ReadGalleryLayout>
 
             <ScrollView
                 android:id="@+id/writePage"

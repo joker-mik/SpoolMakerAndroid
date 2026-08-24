@@ -46,4 +46,16 @@
     <string name="content_add">Material hinzuf&#252;gen</string>
     <string name="content_edit">Material bearbeiten</string>
     <string name="content_delete">Material l&#246;schen</string>
+
+    <string name="read_page_result">Ergebnis</string>
+    <string name="read_page_details">Alle Werte</string>
+    <string name="read_page_raw">Rohdaten</string>
+    <string name="button_copy_page">Kopieren</string>
+    <string name="raw_empty">Noch keine Rohdaten. Lies zuerst einen Tag.</string>
+    <string name="content_gallery_result">Ergebnisseite anzeigen</string>
+    <string name="content_gallery_details">Alle Werte anzeigen</string>
+    <string name="content_gallery_raw">Rohdaten anzeigen</string>
+    <string name="copy_no_data">Noch keine Daten zum Kopieren vorhanden.</string>
+    <string name="copy_clipboard_unavailable">Zwischenablage ist auf diesem Ger&#228;t nicht verf&#252;gbar.</string>
+    <string name="copy_result_done">Ergebnis wurde kopiert.</string>
 </resources>
