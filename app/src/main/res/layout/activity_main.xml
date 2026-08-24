@@ -159,12 +159,18 @@
 
                                 <Button
                                     android:id="@+id/buttonCopySummary"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="44dp"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                                    android:contentDescription="@string/button_copy_page"
+                                    android:drawableStart="@drawable/ic_copy"
+                                    android:drawableTint="@color/copy_icon_tint"
+                                    android:enabled="false"
+                                    android:gravity="center"
                                     android:minHeight="0dp"
                                     android:minWidth="0dp"
-                                    android:text="@string/button_copy_page"
-                                    android:textAllCaps="false" />
+                                    android:padding="12dp"
+                                    android:text="" />
                             </LinearLayout>
 
                             <TextView
@@ -266,14 +272,28 @@
 
                                 <Button
                                     android:id="@+id/buttonCopyDetails"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="44dp"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                                    android:contentDescription="@string/button_copy_page"
+                                    android:drawableStart="@drawable/ic_copy"
+                                    android:drawableTint="@color/copy_icon_tint"
                                     android:enabled="false"
+                                    android:gravity="center"
                                     android:minHeight="0dp"
                                     android:minWidth="0dp"
-                                    android:text="@string/button_copy_page"
-                                    android:textAllCaps="false" />
+                                    android:padding="12dp"
+                                    android:text="" />
                             </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/textDetailsEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="@string/details_empty"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="16sp" />
 
                             <TextView
                                 android:id="@+id/textFullDetails"
@@ -281,10 +301,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="12dp"
                                 android:fontFamily="monospace"
-                                android:text="@string/details_empty"
                                 android:textColor="@color/text_primary"
                                 android:textIsSelectable="true"
-                                android:textSize="12sp" />
+                                android:textSize="12sp"
+                                android:visibility="gone" />
                         </LinearLayout>
                     </ScrollView>
 
@@ -318,14 +338,28 @@
 
                                 <Button
                                     android:id="@+id/buttonCopyRaw"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="44dp"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                                    android:contentDescription="@string/button_copy_page"
+                                    android:drawableStart="@drawable/ic_copy"
+                                    android:drawableTint="@color/copy_icon_tint"
                                     android:enabled="false"
+                                    android:gravity="center"
                                     android:minHeight="0dp"
                                     android:minWidth="0dp"
-                                    android:text="@string/button_copy_page"
-                                    android:textAllCaps="false" />
+                                    android:padding="12dp"
+                                    android:text="" />
                             </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/textRawEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:text="@string/raw_empty"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="16sp" />
 
                             <TextView
                                 android:id="@+id/textRawDumpVisible"
@@ -333,10 +367,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="12dp"
                                 android:fontFamily="monospace"
-                                android:text="@string/raw_empty"
                                 android:textColor="@color/text_primary"
                                 android:textIsSelectable="true"
-                                android:textSize="11sp" />
+                                android:textSize="11sp"
+                                android:visibility="gone" />
                         </LinearLayout>
                     </ScrollView>
                 </FrameLayout>
@@ -411,7 +445,6 @@
                     android:id="@+id/textRawDump"
                     android:layout_width="1dp"
                     android:layout_height="1dp"
-                    android:text="@string/raw_empty"
                     android:visibility="gone" />
             </de.spoolmaker.android.ui.ReadGalleryLayout>
 
@@ -432,15 +465,6 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/section_write"
-                        android:textColor="@color/text_primary"
-                        android:textSize="24sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
                         android:text="@string/material_label"
                         android:textColor="@color/text_primary"
                         android:textStyle="bold" />
@@ -486,13 +510,6 @@
                         android:maxLines="1"
                         android:text="1000" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/weight_help"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
                 </LinearLayout>
             </ScrollView>
         </FrameLayout>
@@ -748,13 +765,17 @@
                     android:contentDescription="@string/content_delete"
                     android:padding="14dp"
                     android:src="@drawable/ic_delete" />
-            </LinearLayout>
 
-            <Button
-                android:id="@+id/buttonImport"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:text="@string/button_import" />
+                <ImageButton
+                    android:id="@+id/buttonImport"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/content_import_database"
+                    android:padding="14dp"
+                    android:src="@drawable/ic_database_import" />
+            </LinearLayout>
         </LinearLayout>
 
         <ScrollView
