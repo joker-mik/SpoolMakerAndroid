@@ -25,7 +25,8 @@ public final class NtagIo {
 
     public enum TagModel {
         NTAG215("NTAG215", NTAG215_USER_BYTES, 130, 131),
-        NTAG216("NTAG216", NTAG216_USER_BYTES, 226, 227);
+        NTAG216("NTAG216", NTAG216_USER_BYTES, 226, 227),
+        NTAG216F("NTAG216F", NTAG216_USER_BYTES, 226, 227);
 
         private final String displayName;
         private final int userBytes;
@@ -62,7 +63,9 @@ public final class NtagIo {
 
         private TagInfo(TagModel model, byte[] versionResponse) {
             this.model = model;
-            this.versionResponse = Arrays.copyOf(versionResponse, versionResponse.length);
+            this.versionResponse = versionResponse == null
+                    ? new byte[0]
+                    : Arrays.copyOf(versionResponse, versionResponse.length);
         }
 
         public TagModel getModel() {
@@ -143,7 +146,7 @@ public final class NtagIo {
         NfcA technology = requireTechnology(tag);
         try {
             connect(technology);
-            TagInfo tagInfo = inspectConnectedTag(technology);
+            TagInfo tagInfo = inspectConnectedTagForRead(technology);
             byte[] memory = readBytes(technology, FIRST_USER_PAGE, tagInfo.getUserBytes());
             return new ReadResult(tagInfo, memory);
         } finally {
@@ -292,6 +295,32 @@ public final class NtagIo {
         return parseVersionResponse(response);
     }
 
+    /**
+     * Reading is intentionally a little more permissive than writing. Some genuine
+     * UltiMaker spools use an NTAG216-family variant whose GET_VERSION response is
+     * different from the plain NTAG216. If GET_VERSION is unknown, the NFC Forum
+     * Type 2 capability container is sufficient to determine whether the readable
+     * memory has NTAG215/216 size. No write is ever allowed through this fallback.
+     */
+    private static TagInfo inspectConnectedTagForRead(NfcA technology) throws IOException {
+        byte[] versionResponse = null;
+        IOException versionFailure;
+        try {
+            versionResponse = technology.transceive(new byte[]{(byte) GET_VERSION_COMMAND});
+            return parseVersionResponse(versionResponse);
+        } catch (IOException exception) {
+            versionFailure = exception;
+        }
+
+        try {
+            byte[] page3Block = readFourPages(technology, 3);
+            return parseCapabilityContainer(page3Block, versionResponse);
+        } catch (IOException capabilityFailure) {
+            capabilityFailure.addSuppressed(versionFailure);
+            throw capabilityFailure;
+        }
+    }
+
     static TagInfo parseVersionResponse(byte[] response) throws IOException {
         if (response == null || response.length < 8) {
             throw new IOException("Tag-Typ konnte nicht über GET_VERSION bestimmt werden. "
@@ -307,28 +336,61 @@ public final class NtagIo {
         int storageSize = response[6] & 0xFF;
         int protocolType = response[7] & 0xFF;
 
-        boolean ntag21xSignature = header == 0x00
+        boolean commonNtagSignature = header == 0x00
                 && vendorId == 0x04
                 && productType == 0x04
-                && productSubtype == 0x02
                 && majorVersion == 0x01
                 && minorVersion == 0x00
                 && protocolType == 0x03;
-        if (!ntag21xSignature) {
+        if (!commonNtagSignature) {
             throw new IOException("Der erkannte NFC-A-Tag ist kein unterstützter NTAG215/NTAG216.");
         }
 
         TagModel model;
-        if (storageSize == 0x11) {
+        if (productSubtype == 0x02 && storageSize == 0x11) {
             model = TagModel.NTAG215;
-        } else if (storageSize == 0x13) {
+        } else if (productSubtype == 0x02 && storageSize == 0x13) {
             model = TagModel.NTAG216;
+        } else if (productSubtype == 0x04 && storageSize == 0x13) {
+            // NTAG216F: same 888-byte user-memory range and the same relevant
+            // lock/config page addresses as NTAG216, but a different product subtype.
+            model = TagModel.NTAG216F;
         } else {
-            throw new IOException("Nicht unterstützte NTAG21x-Speichergröße 0x"
+            throw new IOException("Nicht unterstützte NTAG-Variante (Subtyp 0x"
+                    + String.format(Locale.US, "%02X", productSubtype)
+                    + ", Speicherkennung 0x"
                     + String.format(Locale.US, "%02X", storageSize)
-                    + ". Unterstützt werden NTAG215 und NTAG216.");
+                    + "). Unterstützt werden NTAG215 und NTAG216 einschließlich NTAG216F.");
         }
         return new TagInfo(model, Arrays.copyOf(response, 8));
+    }
+
+    static TagInfo parseCapabilityContainer(byte[] page3Block, byte[] versionResponse)
+            throws IOException {
+        if (page3Block == null || page3Block.length < 4) {
+            throw new IOException("Capability Container des NFC-Tags konnte nicht gelesen werden.");
+        }
+
+        int magic = page3Block[0] & 0xFF;
+        int mappingVersion = page3Block[1] & 0xFF;
+        int ndefMemorySize = page3Block[2] & 0xFF;
+        if (magic != 0xE1 || (mappingVersion & 0xF0) != 0x10) {
+            throw new IOException("Der Tag besitzt keinen unterstützten NFC-Forum-Type-2 Capability Container.");
+        }
+
+        TagModel model;
+        if (ndefMemorySize == 0x3E) {
+            model = TagModel.NTAG215;
+        } else if (ndefMemorySize == 0x6D) {
+            // NTAG216 and NTAG216F both advertise 872 bytes NDEF memory in the
+            // capability container while exposing 888 bytes of user memory.
+            model = TagModel.NTAG216;
+        } else {
+            throw new IOException("Nicht unterstützte NFC-Type-2-Speichergröße im Capability Container: 0x"
+                    + String.format(Locale.US, "%02X", ndefMemorySize) + ".");
+        }
+
+        return new TagInfo(model, versionResponse);
     }
 
     private static byte[] readBytes(NfcA technology, int startPage, int byteCount)

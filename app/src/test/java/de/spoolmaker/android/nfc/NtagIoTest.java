@@ -17,6 +17,9 @@ public final class NtagIoTest {
     private static final byte[] VERSION_216 = new byte[]{
             0x00, 0x04, 0x04, 0x02, 0x01, 0x00, 0x13, 0x03
     };
+    private static final byte[] VERSION_216F = new byte[]{
+            0x00, 0x04, 0x04, 0x04, 0x01, 0x00, 0x13, 0x03
+    };
     private static final byte[] VERSION_213 = new byte[]{
             0x00, 0x04, 0x04, 0x02, 0x01, 0x00, 0x0F, 0x03
     };
@@ -25,6 +28,31 @@ public final class NtagIoTest {
     public void getVersionAcceptsNtag215AndNtag216() throws Exception {
         NtagIo.TagInfo ntag215 = NtagIo.parseVersionResponse(VERSION_215);
         NtagIo.TagInfo ntag216 = NtagIo.parseVersionResponse(VERSION_216);
+        NtagIo.TagInfo ntag216f = NtagIo.parseVersionResponse(VERSION_216F);
+
+        assertEquals(NtagIo.TagModel.NTAG215, ntag215.getModel());
+        assertEquals(NtagIo.NTAG215_USER_BYTES, ntag215.getUserBytes());
+        assertEquals(NtagIo.TagModel.NTAG216, ntag216.getModel());
+        assertEquals(NtagIo.NTAG216_USER_BYTES, ntag216.getUserBytes());
+        assertEquals(NtagIo.TagModel.NTAG216F, ntag216f.getModel());
+        assertEquals(NtagIo.NTAG216_USER_BYTES, ntag216f.getUserBytes());
+    }
+
+    @Test
+    public void getVersionRejectsOtherNtag21xSizes() {
+        IOException exception = assertThrows(IOException.class,
+                () -> NtagIo.parseVersionResponse(VERSION_213));
+        assertTrue(exception.getMessage().contains("NTAG215 und NTAG216"));
+    }
+
+
+    @Test
+    public void capabilityContainerFallbackRecognizesNtag215And216() throws Exception {
+        byte[] cc215 = new byte[]{(byte) 0xE1, 0x10, 0x3E, 0x00};
+        byte[] cc216 = new byte[]{(byte) 0xE1, 0x10, 0x6D, 0x00};
+
+        NtagIo.TagInfo ntag215 = NtagIo.parseCapabilityContainer(cc215, null);
+        NtagIo.TagInfo ntag216 = NtagIo.parseCapabilityContainer(cc216, null);
 
         assertEquals(NtagIo.TagModel.NTAG215, ntag215.getModel());
         assertEquals(NtagIo.NTAG215_USER_BYTES, ntag215.getUserBytes());
@@ -33,10 +61,11 @@ public final class NtagIoTest {
     }
 
     @Test
-    public void getVersionRejectsOtherNtag21xSizes() {
+    public void capabilityContainerFallbackRejectsUnsupportedSize() {
+        byte[] cc213 = new byte[]{(byte) 0xE1, 0x10, 0x12, 0x00};
         IOException exception = assertThrows(IOException.class,
-                () -> NtagIo.parseVersionResponse(VERSION_213));
-        assertTrue(exception.getMessage().contains("NTAG215 und NTAG216"));
+                () -> NtagIo.parseCapabilityContainer(cc213, null));
+        assertTrue(exception.getMessage().contains("Speichergröße"));
     }
 
     @Test
