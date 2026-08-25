@@ -1030,12 +1030,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         return false;
     }
 
-    @Override
-    public void onBackPressed() {
-        if (!handleBackNavigation()) {
-            super.onBackPressed();
-        }
-    }
+	@android.annotation.SuppressLint("GestureBackNavigation")
+	@Override
+	public void onBackPressed() {
+		if (!handleBackNavigation()) {
+			super.onBackPressed();
+		}
+	}
 
     private void registerModernBackHandler() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
