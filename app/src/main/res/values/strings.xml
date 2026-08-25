@@ -26,7 +26,7 @@
     <string name="page_materials">Materialbibliothek</string>
     <string name="page_info">Info</string>
     <string name="page_license">Lizenz &amp; Open Source</string>
-    <string name="version_footer">Version 1.1.18</string>
+    <string name="version_footer">Version 1.2.0</string>
     <string name="license_app_version">Spool Maker Android %1$s</string>
     <string name="license_badge">GPL-3.0-or-later</string>
     <string name="license_intro">Freie Software mit offenem Quellcode. Die Hinweise auf dieser Seite fassen Herkunft, Änderungsstand und Lizenz zusammen.</string>

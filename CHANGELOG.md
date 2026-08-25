@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0
+
+- Initiale, gehaertete 1.2-Fassung.
+- Lizenz-, Herkunfts- und Aenderungshinweise aus dem aktualisierten 1.1.18-Stand inhaltlich beibehalten.
+- NTAG215 und NTAG216 werden vor dem Schreiben explizit per `GET_VERSION` erkannt; andere NTAG21x-Typen werden abgewiesen.
+- Tagkapazitaet wird beim Lesen beruecksichtigt: 504 Byte fuer NTAG215, 888 Byte fuer NTAG216.
+- Vor dem ersten Schreibbyte werden statische/dynamische Lock-Bits und Passwortschutz des Zielbereichs geprueft.
+- Schreibdialog bleibt bis nach der Ruecklesepruefung aktiv; Teilabbrueche werden als potenziell teilweise geschriebener Tag gemeldet.
+- Ruecklesepruefung nach dem Schreiben auf die tatsaechlich geschriebenen 228 Byte begrenzt.
+- Gesamtintegritaet prueft jetzt CRC, UID/Serienfeld, Record-Anzahlen, Signaturmarker und das erwartete NDEF-Layout gemeinsam.
+- Materialimport in einen Hintergrund-Executor verschoben und gegen uebergrosse/zu komplexe XML-Dateien sowie DTD/DOCTYPE gehaertet.
+- Materialbibliothek speichert eine letzte gueltige JSON-Sicherung und behandelt beschaedigten Primarbestand nicht mehr still als leer.
+- Sichtbare Status-/Fehlermeldungen von Textpraefix-Heuristiken entkoppelt.
+- Standalone-Codec-Selbsttest aktualisiert; CI verwendet den Projekt-Bootstrap und fuehrt Unit-Tests, Lint und Build aus.
+- Versions- und Formatdokumentation auf `1.2.0` / `versionCode 29` synchronisiert.
 ## 1.1.18
 
 - Lizenz- und Herkunftshinweise fuer den Android-Port praezisiert.

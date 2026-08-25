@@ -54,21 +54,32 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
     private static final int REQUEST_IMPORT_MATERIAL = 1401;
-    private static final int READ_BYTES = NtagIo.NTAG216_USER_BYTES;
+    private static final int MAX_IMPORT_FILES = 32;
+    private static final AtomicBoolean NFC_IO_ACTIVE = new AtomicBoolean(false);
 
-    private enum PendingAction {
-        NONE,
-        READ,
-        WRITE
+    private enum NfcState {
+        IDLE,
+        WAITING_READ,
+        WAITING_WRITE,
+        READING,
+        WRITING
+    }
+
+    private enum StatusKind {
+        INFO,
+        SUCCESS,
+        WARNING
     }
 
     private NfcAdapter nfcAdapter;
@@ -99,6 +110,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private Button buttonCopyRaw;
     private ImageButton buttonEdit;
     private ImageButton buttonDelete;
+    private Button buttonRead;
     private Button buttonWrite;
     private Spinner spinnerWriteDateMeaning;
     private Button buttonWriteDate;
@@ -129,12 +141,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private TextView textPageTitle;
     private TextView textPageBody;
     private AlertDialog nfcPrompt;
+    private TextView nfcPromptMessage;
     private String selectedLibraryGuid;
 
     private ArrayAdapter<String> materialAdapter;
     private List<MaterialProfile> materials = new ArrayList<>();
 
-    private volatile PendingAction pendingAction = PendingAction.NONE;
+    private final Object nfcStateLock = new Object();
+    private volatile NfcState nfcState = NfcState.IDLE;
+    private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
     private volatile MaterialProfile pendingWriteMaterial;
     private volatile long pendingWriteTotalWeightMg;
     private volatile long pendingWriteRemainingWeightMg;
@@ -163,11 +178,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             registerModernBackHandler();
 
             if (nfcAdapter == null) {
-                setStatus("Dieses Android-Ger\u00e4t besitzt keinen kompatiblen NFC-Adapter.");
+                showUserMessage(StatusKind.WARNING,
+                        "Dieses Android-Gerät besitzt keinen kompatiblen NFC-Adapter.");
             } else if (!nfcAdapter.isEnabled()) {
-                setStatus("NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst.");
+                showUserMessage(StatusKind.WARNING,
+                        "NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst.");
             }
-        } catch (Throwable startupError) {
+        } catch (RuntimeException startupError) {
             showStartupFailure(startupError);
         }
     }
@@ -270,7 +287,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         root.requestApplyInsets();
     }
 
-    private void showStartupFailure(Throwable startupError) {
+    private void showStartupFailure(RuntimeException startupError) {
         TextView message = new TextView(this);
         message.setPadding(32, 32, 32, 32);
         message.setTextSize(16);
@@ -287,13 +304,19 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     protected void onResume() {
         super.onResume();
         enableReaderMode();
+        updateNfcActionButtons();
     }
 
     @Override
     protected void onPause() {
-        dismissNfcPrompt();
-        boolean hadPendingAction = pendingAction != PendingAction.NONE;
-        cancelPendingAction(hadPendingAction);
+        if (isNfcWaiting()) {
+            dismissNfcPrompt();
+            cancelPendingAction(false);
+        } else if (isNfcProcessing()) {
+            // The platform may pause the Activity while a transceive is active. Do not
+            // pretend to cancel an EEPROM write that may already be in progress.
+            dismissNfcPrompt();
+        }
         if (nfcAdapter != null) {
             nfcAdapter.disableReaderMode(this);
         }
@@ -301,82 +324,124 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     @Override
+    protected void onDestroy() {
+        importExecutor.shutdownNow();
+        super.onDestroy();
+    }
+
+    @Override
     public void onTagDiscovered(Tag tag) {
-        PendingAction action = pendingAction;
-        if (action == PendingAction.NONE) {
-            return;
+        final NfcState operation;
+        final MaterialProfile writeMaterial;
+        final long writeTotalWeightMg;
+        final long writeRemainingWeightMg;
+        final UltimakerTagCodec.DateMeaning writeDateMeaning;
+        final long writeDateEpochSeconds;
+
+        boolean globalIoAcquired = false;
+        synchronized (nfcStateLock) {
+            if (nfcState == NfcState.WAITING_READ) {
+                operation = NfcState.READING;
+            } else if (nfcState == NfcState.WAITING_WRITE) {
+                operation = NfcState.WRITING;
+            } else {
+                return;
+            }
+            globalIoAcquired = NFC_IO_ACTIVE.compareAndSet(false, true);
+            if (!globalIoAcquired) {
+                nfcState = NfcState.IDLE;
+                clearPendingWriteDataLocked();
+                postUi(() -> {
+                    dismissNfcPrompt();
+                    updateNfcActionButtons();
+                    showUserMessage(StatusKind.WARNING,
+                            "Eine andere NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
+                });
+                return;
+            }
+            nfcState = operation;
+            writeMaterial = pendingWriteMaterial;
+            writeTotalWeightMg = pendingWriteTotalWeightMg;
+            writeRemainingWeightMg = pendingWriteRemainingWeightMg;
+            writeDateMeaning = pendingWriteDateMeaning;
+            writeDateEpochSeconds = pendingWriteDateEpochSeconds;
+            clearPendingWriteDataLocked();
         }
 
-        runOnUiThread(this::dismissNfcPrompt);
-
-        MaterialProfile writeMaterial = pendingWriteMaterial;
-        long writeTotalWeightMg = pendingWriteTotalWeightMg;
-        long writeRemainingWeightMg = pendingWriteRemainingWeightMg;
-        UltimakerTagCodec.DateMeaning writeDateMeaning = pendingWriteDateMeaning;
-        long writeDateEpochSeconds = pendingWriteDateEpochSeconds;
-        pendingAction = PendingAction.NONE;
-        pendingWriteMaterial = null;
-        pendingWriteTotalWeightMg = 0;
-        pendingWriteRemainingWeightMg = 0;
-        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
-        pendingWriteDateEpochSeconds = 0;
-
         String uid = NtagIo.formatUid(tag);
-        runOnUiThread(() -> setStatus("NFC-Tag " + uid + " erkannt. Verarbeitung l\u00e4uft ..."));
+        postUi(() -> updateNfcPromptForProcessing(operation == NfcState.WRITING));
 
         try {
-            if (action == PendingAction.READ) {
-                byte[] memory = NtagIo.readUserMemory(tag, READ_BYTES);
+            if (operation == NfcState.READING) {
+                NtagIo.ReadResult readResult = NtagIo.readSupportedUserMemory(tag);
+                byte[] memory = readResult.getUserMemory();
                 UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(memory);
-                runOnUiThread(() -> {
+                String model = readResult.getTagInfo().getDisplayName();
+                postUi(() -> {
+                    dismissNfcPrompt();
                     showDecodedSpool(uid, decoded, memory);
-                    setStatus("Tag wurde erfolgreich gelesen. Fuer einen neuen Scan den Tag entfernen und erneut anhalten.");
+                    showUserMessage(StatusKind.SUCCESS,
+                            model + " wurde erfolgreich gelesen.");
                     vibrateSuccess();
                 });
                 return;
             }
 
             if (writeMaterial == null) {
-                throw new IllegalStateException("Kein Material f\u00fcr den Schreibvorgang ausgew\u00e4hlt.");
+                throw new IllegalStateException("Kein Material für den Schreibvorgang ausgewählt.");
             }
 
             byte[] encoded = UltimakerTagCodec.encodeSpool(
                     writeMaterial.getGuid(), uid,
                     writeTotalWeightMg, writeRemainingWeightMg,
                     writeDateMeaning, writeDateEpochSeconds);
-            NtagIo.writeUserMemory(tag, encoded);
 
-            byte[] verification = NtagIo.readUserMemory(tag, READ_BYTES);
-            if (verification.length < encoded.length
-                    || !Arrays.equals(encoded, Arrays.copyOf(verification, encoded.length))) {
-                throw new IOException("Die R\u00fccklesepr\u00fcfung stimmt nicht mit den geschriebenen Daten \u00fcberein.");
-            }
-
+            NtagIo.WriteResult writeResult = NtagIo.writeAndVerifyUserMemory(tag, encoded);
+            byte[] verification = writeResult.getVerification();
             UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(verification);
+
             if (!decoded.getMaterialGuid().equals(writeMaterial.getGuid())
                     || decoded.getTotalAmount() != writeTotalWeightMg
                     || decoded.getRemainingAmount() != writeRemainingWeightMg
-                    || !decoded.isStatusCrcValid()
-                    || !UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())
+                    || !UltimakerTagCodec.isIntegrityValid(uid, decoded)
                     || !decoded.isSpoolMakerTag()
                     || decoded.getDateMeaning() != writeDateMeaning
                     || (writeDateMeaning != UltimakerTagCodec.DateMeaning.NONE
                     && Math.round(decoded.getTimeFieldDoubleSeconds()) != writeDateEpochSeconds)) {
-                throw new IOException("Der Tag wurde gelesen, aber die Inhaltspr\u00fcfung ist fehlgeschlagen.");
+                throw new IOException(
+                        "Der Tag wurde vollständig geschrieben, aber die semantische Inhaltsprüfung ist fehlgeschlagen.");
             }
 
-            runOnUiThread(() -> {
+            String model = writeResult.getTagInfo().getDisplayName();
+            postUi(() -> {
+                dismissNfcPrompt();
                 showDecodedSpool(uid, decoded, verification);
-                setStatus("Tag wurde geschrieben und bytegenau zur\u00fcckgelesen.");
+                showUserMessage(StatusKind.SUCCESS,
+                        model + " wurde geschrieben und über " + verification.length
+                                + " Byte bytegenau verifiziert.");
                 vibrateSuccess();
             });
+        } catch (NtagIo.PartialWriteException exception) {
+            String detail = safeExceptionMessage(exception);
+            postUi(() -> {
+                dismissNfcPrompt();
+                showUserError("NFC-Schreibfehler", detail);
+            });
         } catch (Exception exception) {
-            String detail = exception.getMessage();
-            if (detail == null || detail.trim().isEmpty()) {
-                detail = exception.getClass().getSimpleName();
+            String detail = safeExceptionMessage(exception);
+            postUi(() -> {
+                dismissNfcPrompt();
+                showUserError("NFC-Fehler", detail);
+            });
+        } finally {
+            if (globalIoAcquired) {
+                NFC_IO_ACTIVE.set(false);
             }
-            String finalDetail = detail;
-            runOnUiThread(() -> setStatus("NFC-Fehler: " + finalDetail));
+            synchronized (nfcStateLock) {
+                nfcState = NfcState.IDLE;
+                clearPendingWriteDataLocked();
+            }
+            postUi(this::updateNfcActionButtons);
         }
     }
 
@@ -388,11 +453,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
 
         List<Uri> uris = new ArrayList<>();
+        boolean tooMany = false;
         ClipData clipData = data.getClipData();
         if (clipData != null) {
             for (int index = 0; index < clipData.getItemCount(); index++) {
                 Uri uri = clipData.getItemAt(index).getUri();
                 if (uri != null && !uris.contains(uri)) {
+                    if (uris.size() >= MAX_IMPORT_FILES) {
+                        tooMany = true;
+                        break;
+                    }
                     uris.add(uri);
                 }
             }
@@ -400,36 +470,71 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             uris.add(data.getData());
         }
 
-        int imported = 0;
+        if (tooMany) {
+            showUserMessage(StatusKind.WARNING,
+                    "Es können höchstens " + MAX_IMPORT_FILES
+                            + " Materialdateien pro Import verarbeitet werden.");
+            return;
+        }
+        if (uris.isEmpty()) {
+            showUserMessage(StatusKind.WARNING, "Keine Materialdatei ausgewählt.");
+            return;
+        }
+
+        showUserMessage(StatusKind.INFO, "Materialimport läuft …");
+        importExecutor.execute(() -> importMaterials(uris));
+    }
+
+    private void importMaterials(List<Uri> uris) {
+        List<MaterialProfile> parsedProfiles = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        String lastGuid = null;
+
         for (Uri uri : uris) {
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
             try (InputStream stream = getContentResolver().openInputStream(uri)) {
                 if (stream == null) {
-                    throw new IOException("Datei konnte nicht ge\u00f6ffnet werden.");
+                    throw new IOException("Datei konnte nicht geöffnet werden.");
                 }
-                MaterialProfile profile = curaMaterialParser.parse(stream);
-                materialStore.upsert(profile);
-                lastGuid = profile.getGuid();
-                imported++;
+                parsedProfiles.add(curaMaterialParser.parse(stream));
             } catch (IOException | XmlPullParserException | IllegalArgumentException exception) {
-                String message = exception.getMessage();
-                errors.add(message == null ? "Unbekannter Importfehler" : message);
+                errors.add(safeExceptionMessage(exception));
             }
         }
 
-        refreshMaterials(lastGuid);
-        if (imported > 0 && errors.isEmpty()) {
-            setStatus(imported + (imported == 1
-                    ? " Material wurde importiert."
-                    : " Materialien wurden importiert."));
-        } else if (imported > 0) {
-            setStatus(imported + " Materialdatei(en) importiert; " + errors.size()
-                    + " Datei(en) konnten nicht gelesen werden. Erster Fehler: " + errors.get(0));
-        } else {
-            setStatus("Import fehlgeschlagen: "
-                    + (errors.isEmpty() ? "Keine Datei ausgew\u00e4hlt." : errors.get(0)));
+        if (!parsedProfiles.isEmpty()) {
+            try {
+                materialStore.upsertAll(parsedProfiles);
+            } catch (RuntimeException exception) {
+                errors.add("Materialbibliothek konnte nicht gespeichert werden: "
+                        + safeExceptionMessage(exception));
+                parsedProfiles.clear();
+            }
         }
+
+        final int imported = parsedProfiles.size();
+        final String lastGuid = imported == 0 ? null
+                : parsedProfiles.get(imported - 1).getGuid();
+        final String firstError = errors.isEmpty() ? null : errors.get(0);
+        final int errorCount = errors.size();
+
+        postUi(() -> {
+            refreshMaterials(lastGuid);
+            if (imported > 0 && errorCount == 0) {
+                showUserMessage(StatusKind.SUCCESS, imported == 1
+                        ? "1 Material wurde importiert."
+                        : imported + " Materialien wurden importiert.");
+            } else if (imported > 0) {
+                showUserMessage(StatusKind.WARNING,
+                        imported + " Materialdatei(en) importiert; " + errorCount
+                                + " Datei(en) konnten nicht verarbeitet werden. Erster Fehler: "
+                                + firstError);
+            } else {
+                showUserError("Import fehlgeschlagen",
+                        firstError == null ? "Keine Datei konnte importiert werden." : firstError);
+            }
+        });
     }
 
     private void bindViews() {
@@ -457,6 +562,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         buttonCopyRaw = findViewById(R.id.buttonCopyRaw);
         buttonEdit = findViewById(R.id.buttonEdit);
         buttonDelete = findViewById(R.id.buttonDelete);
+        buttonRead = findViewById(R.id.buttonRead);
         buttonWrite = findViewById(R.id.buttonWrite);
         readPage = findViewById(R.id.readPage);
         writePage = findViewById(R.id.writePage);
@@ -608,7 +714,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         });
         buttonDelete.setOnClickListener(view -> confirmDeleteSelectedMaterial());
         findViewById(R.id.buttonImport).setOnClickListener(view -> launchMaterialImport());
-        findViewById(R.id.buttonRead).setOnClickListener(view -> armRead());
+        buttonRead.setOnClickListener(view -> armRead());
         buttonWrite.setOnClickListener(view -> confirmAndArmWrite());
         findViewById(R.id.buttonCancel).setOnClickListener(view -> cancelPendingAction(true));
         buttonToggleRaw.setOnClickListener(view -> toggleRawDump());
@@ -716,7 +822,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void selectTab(boolean read) {
         readPage.setVisibility(read ? View.VISIBLE : View.GONE);
         writePage.setVisibility(read ? View.GONE : View.VISIBLE);
-        findViewById(R.id.buttonRead).setVisibility(read ? View.VISIBLE : View.GONE);
+        buttonRead.setVisibility(read ? View.VISIBLE : View.GONE);
         buttonWrite.setVisibility(read ? View.GONE : View.VISIBLE);
         tabRead.setBackgroundResource(read ? R.drawable.bg_tab_selected : android.R.color.transparent);
         tabWrite.setBackgroundResource(read ? android.R.color.transparent : R.drawable.bg_tab_selected);
@@ -854,15 +960,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(72), dp(72));
         body.addView(icon, iconParams);
 
-        TextView text = new TextView(this);
-        text.setText(write
-                ? "Beschreibbaren NFC-Tag an die NFC-Antenne des Smartphones halten."
-                : "NFC-Tag an die NFC-Antenne des Smartphones halten.");
-        text.setTextSize(19f);
-        text.setTextColor(getColor(R.color.text_primary));
-        text.setGravity(android.view.Gravity.CENTER);
-        text.setPadding(0, dp(18), 0, dp(6));
-        body.addView(text);
+        nfcPromptMessage = new TextView(this);
+        nfcPromptMessage.setText(write
+                ? "Beschreibbaren NTAG215 oder NTAG216 an die NFC-Antenne halten."
+                : "NTAG215 oder NTAG216 an die NFC-Antenne halten.");
+        nfcPromptMessage.setTextSize(19f);
+        nfcPromptMessage.setTextColor(getColor(R.color.text_primary));
+        nfcPromptMessage.setGravity(android.view.Gravity.CENTER);
+        nfcPromptMessage.setPadding(0, dp(18), 0, dp(6));
+        body.addView(nfcPromptMessage);
 
         nfcPrompt = new AlertDialog.Builder(this)
                 .setTitle(write ? "NFC-Tag schreiben" : "NFC-Tag lesen")
@@ -874,15 +980,37 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         nfcPrompt.show();
     }
 
+    private void updateNfcPromptForProcessing(boolean write) {
+        if (nfcPrompt == null || !nfcPrompt.isShowing()) {
+            return;
+        }
+        nfcPrompt.setTitle(write ? "NFC-Tag wird geschrieben" : "NFC-Tag wird gelesen");
+        if (nfcPromptMessage != null) {
+            nfcPromptMessage.setText(write
+                    ? "Tag erkannt. Typ und Schreibschutz werden geprüft, danach wird geschrieben und verifiziert. Tag nicht entfernen."
+                    : "Tag erkannt. Typ und Speicher werden geprüft und gelesen. Tag nicht entfernen.");
+        }
+        nfcPrompt.setCancelable(false);
+        Button negative = nfcPrompt.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (negative != null) {
+            negative.setEnabled(false);
+            negative.setVisibility(View.GONE);
+        }
+    }
+
     private void dismissNfcPrompt() {
         if (nfcPrompt != null) {
             nfcPrompt.dismiss();
             nfcPrompt = null;
+            nfcPromptMessage = null;
         }
     }
 
     private boolean handleBackNavigation() {
         if (nfcPrompt != null && nfcPrompt.isShowing()) {
+            if (isNfcProcessing()) {
+                return true;
+            }
             dismissNfcPrompt();
             cancelPendingAction(false);
             return true;
@@ -937,7 +1065,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         spinnerMaterial.setEnabled(hasMaterials);
         buttonEdit.setEnabled(hasMaterials);
         buttonDelete.setEnabled(hasMaterials);
-        buttonWrite.setEnabled(hasMaterials);
+        updateNfcActionButtons();
 
         if (hasMaterials && selectedGuid != null) {
             for (int index = 0; index < materials.size(); index++) {
@@ -1015,12 +1143,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                                 editColor.getText().toString(),
                                 editGuid.getText().toString(),
                                 spoolWeightMg);
-                        if (existing != null && !existing.getGuid().equals(profile.getGuid())) {
-                            materialStore.remove(existing.getGuid());
+                        if (existing != null) {
+                            materialStore.replace(existing.getGuid(), profile);
+                        } else {
+                            materialStore.upsert(profile);
                         }
-                        materialStore.upsert(profile);
                         refreshMaterials(profile.getGuid());
-                        setStatus("Material gespeichert: " + profile.getDisplayName());
+                        showUserMessage(StatusKind.SUCCESS,
+                                "Material gespeichert: " + profile.getDisplayName());
                         dialog.dismiss();
                     } catch (IllegalArgumentException exception) {
                         String message = exception.getMessage();
@@ -1029,6 +1159,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                         } else {
                             editGuid.setError(message);
                         }
+                    } catch (RuntimeException exception) {
+                        showUserError("Speichern fehlgeschlagen", safeExceptionMessage(exception));
                     }
                 });
         });
@@ -1045,9 +1177,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 .setMessage(profile.getDisplayName() + "\n" + profile.getGuid())
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("L\u00f6schen", (dialog, which) -> {
-                    materialStore.remove(profile.getGuid());
-                    refreshMaterials(null);
-                    setStatus("Material wurde aus der lokalen Bibliothek gel\u00f6scht.");
+                    try {
+                        materialStore.remove(profile.getGuid());
+                        refreshMaterials(null);
+                        showUserMessage(StatusKind.SUCCESS,
+                                "Material wurde aus der lokalen Bibliothek gelöscht.");
+                    } catch (RuntimeException exception) {
+                        showUserError("Löschen fehlgeschlagen", safeExceptionMessage(exception));
+                    }
                 })
                 .show();
     }
@@ -1067,13 +1204,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (!ensureNfcReady()) {
             return;
         }
-        pendingWriteMaterial = null;
-        pendingWriteTotalWeightMg = 0;
-        pendingWriteRemainingWeightMg = 0;
-        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
-        pendingWriteDateEpochSeconds = 0;
-        pendingAction = PendingAction.READ;
-        setStatus("Lesen ist aktiviert.");
+        synchronized (nfcStateLock) {
+            if (nfcState != NfcState.IDLE) {
+                showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
+                return;
+            }
+            clearPendingWriteDataLocked();
+            nfcState = NfcState.WAITING_READ;
+        }
+        updateNfcActionButtons();
+        setInternalStatus("Lesen ist aktiviert.");
         showNfcPrompt(false);
     }
 
@@ -1083,7 +1223,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
         MaterialProfile profile = getSelectedMaterial();
         if (profile == null) {
-            setStatus("Vor dem Schreiben muss ein Material angelegt oder importiert werden.");
+            showUserMessage(StatusKind.WARNING,
+                    "Vor dem Schreiben muss ein Material angelegt oder importiert werden.");
             return;
         }
 
@@ -1130,20 +1271,29 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + "Gesamtmenge: " + formatWeight(totalWeightMg) + "\n"
                 + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n"
                 + "Filament-Datum: " + dateSummary + "\n\n"
-                + "Der vorhandene Spuleninhalt wird ueberschrieben. Gesperrte Tags koennen nicht beschrieben werden.";
+                + "Der vorhandene Spuleninhalt wird überschrieben. Zugelassen sind NTAG215 und NTAG216. "
+                + "Tag-Typ, Lock-Bits und Passwortschutz werden vor dem ersten Schreibbyte geprüft.";
 
         new AlertDialog.Builder(this)
                 .setTitle("NFC-Tag schreiben?")
                 .setMessage(message)
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Schreiben aktivieren", (dialog, which) -> {
-                    pendingWriteMaterial = profile;
-                    pendingWriteTotalWeightMg = totalWeightMg;
-                    pendingWriteRemainingWeightMg = remainingWeightMg;
-                    pendingWriteDateMeaning = meaning;
-                    pendingWriteDateEpochSeconds = dateEpochSeconds;
-                    pendingAction = PendingAction.WRITE;
-                    setStatus("Schreiben ist aktiviert.");
+                    synchronized (nfcStateLock) {
+                        if (nfcState != NfcState.IDLE) {
+                            showUserMessage(StatusKind.WARNING,
+                                    "Es läuft bereits eine NFC-Aktion.");
+                            return;
+                        }
+                        pendingWriteMaterial = profile;
+                        pendingWriteTotalWeightMg = totalWeightMg;
+                        pendingWriteRemainingWeightMg = remainingWeightMg;
+                        pendingWriteDateMeaning = meaning;
+                        pendingWriteDateEpochSeconds = dateEpochSeconds;
+                        nfcState = NfcState.WAITING_WRITE;
+                    }
+                    updateNfcActionButtons();
+                    setInternalStatus("Schreiben ist aktiviert.");
                     showNfcPrompt(true);
                 })
                 .show();
@@ -1179,15 +1329,25 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private boolean ensureNfcReady() {
+        if (NFC_IO_ACTIVE.get()) {
+            showUserMessage(StatusKind.WARNING,
+                    "Eine NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
+            return false;
+        }
+        if (isNfcProcessing() || isNfcWaiting()) {
+            showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
+            return false;
+        }
         if (nfcAdapter == null) {
-            setStatus("Dieses Ger\u00e4t besitzt keinen kompatiblen NFC-Adapter.");
+            showUserMessage(StatusKind.WARNING,
+                    "Dieses Gerät besitzt keinen kompatiblen NFC-Adapter.");
             return false;
         }
         if (!nfcAdapter.isEnabled()) {
-            setStatus("NFC ist deaktiviert.");
+            setInternalStatus("NFC ist deaktiviert.");
             new AlertDialog.Builder(this)
                     .setTitle("NFC aktivieren")
-                    .setMessage("Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zur\u00fcck.")
+                    .setMessage("Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zurück.")
                     .setNegativeButton("Abbrechen", null)
                     .setPositiveButton("Einstellungen", (dialog, which) -> openNfcSettings())
                     .show();
@@ -1199,7 +1359,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void openNfcSettings() {
         try {
             startActivity(new Intent(Settings.ACTION_NFC_SETTINGS));
-        } catch (Exception ignored) {
+        } catch (android.content.ActivityNotFoundException ignored) {
             startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
         }
     }
@@ -1217,15 +1377,50 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private void cancelPendingAction(boolean updateStatus) {
-        pendingAction = PendingAction.NONE;
+        synchronized (nfcStateLock) {
+            if (nfcState == NfcState.READING || nfcState == NfcState.WRITING) {
+                if (updateStatus) {
+                    showUserMessage(StatusKind.WARNING,
+                            "Die laufende NFC-Kommunikation kann nicht sicher abgebrochen werden.");
+                }
+                return;
+            }
+            nfcState = NfcState.IDLE;
+            clearPendingWriteDataLocked();
+        }
+        dismissNfcPrompt();
+        updateNfcActionButtons();
+        if (updateStatus) {
+            showUserMessage(StatusKind.INFO, "NFC-Aktion wurde abgebrochen.");
+        }
+    }
+
+    private void clearPendingWriteDataLocked() {
         pendingWriteMaterial = null;
         pendingWriteTotalWeightMg = 0;
         pendingWriteRemainingWeightMg = 0;
         pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
         pendingWriteDateEpochSeconds = 0;
-        if (updateStatus) {
-            setStatus("NFC-Aktion wurde abgebrochen.");
+    }
+
+    private boolean isNfcWaiting() {
+        NfcState state = nfcState;
+        return state == NfcState.WAITING_READ || state == NfcState.WAITING_WRITE;
+    }
+
+    private boolean isNfcProcessing() {
+        NfcState state = nfcState;
+        return state == NfcState.READING || state == NfcState.WRITING;
+    }
+
+    private void updateNfcActionButtons() {
+        if (buttonRead == null || buttonWrite == null) {
+            return;
         }
+        boolean idle = nfcState == NfcState.IDLE;
+        boolean nfcReady = nfcAdapter != null && nfcAdapter.isEnabled();
+        buttonRead.setEnabled(idle && nfcReady);
+        buttonWrite.setEnabled(idle && nfcReady && !materials.isEmpty());
     }
 
     private long parseWeightMg(String raw, boolean allowZero) {
@@ -1288,15 +1483,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + " (" + decoded.getStationId() + ")");
 
         boolean uidMatches = UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial());
-        boolean integrityOk = decoded.isStatusCrcValid()
-                && uidMatches
-                && decoded.getMaterialRecordCount() == 1
-                && decoded.getStatusRecordCount() == 2;
+        boolean expectedLayout = UltimakerTagCodec.hasExpectedNdefLayout(decoded);
+        boolean integrityOk = UltimakerTagCodec.isIntegrityValid(uid, decoded);
         String integrity = "CRC-8 " + (decoded.isStatusCrcValid() ? "gueltig" : "UNGUELTIG")
                 + ", aktiv Status " + decoded.getActiveStatusRecordIndex()
                 + ", UID/Serial " + (uidMatches ? "OK" : "ABWEICHEND")
+                + ", Materialrecords " + decoded.getMaterialRecordCount()
+                + ", Signaturrecords " + decoded.getSignatureRecordCount()
                 + ", Statusrecords " + decoded.getStatusRecordCount()
                 + (decoded.isDuplicateStatusMatches() ? " (bytegleich)" : " (unterschiedlich, normal moeglich)")
+                + ", Layout " + (expectedLayout ? "OK" : "ABWEICHEND")
                 + ", Sig-Marker " + (decoded.hasExpectedSigMarker() ? "0x2000" : "fehlt/abweichend");
         textCrc.setText(getString(R.string.label_crc) + ": " + integrity);
         textCrc.setTextColor(getColor(integrityOk ? R.color.accent_dark : R.color.danger));
@@ -1325,8 +1521,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         appendHeading(out, "TAG UND NDEF");
         appendValue(out, "Chip-UID", uid);
         appendValue(out, "Materialrecord-Serienfeld", emptyAsMarker(decoded.getSerial()));
-        appendValue(out, "Gelesener Benutzerspeicher", decoded.getReadMemoryLength() + " Byte");
-        appendValue(out, "Speicherseiten", "NTAG-Seite 4 bis "
+        appendValue(out, "An Decoder uebergebener Datenbereich", decoded.getReadMemoryLength() + " Byte");
+        appendValue(out, "Datenbereich", "NTAG-Seite 4 bis "
                 + (NtagIo.FIRST_USER_PAGE + decoded.getReadMemoryLength() / 4 - 1));
         appendValue(out, "NDEF-Ablage", decoded.isTlvWrapped()
                 ? "NFC-Forum-Type-2-TLV" : "roher NDEF-Bytestrom ab Seite 4");
@@ -1403,6 +1599,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         appendValue(out, "UID entspricht Serienfeld",
                 yesNo(UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())));
         appendValue(out, "Sig-Marker 0x2000 vorhanden", yesNo(decoded.hasExpectedSigMarker()));
+        appendValue(out, "Erwartetes Vier-Record-NDEF-Layout",
+                yesNo(UltimakerTagCodec.hasExpectedNdefLayout(decoded)));
+        appendValue(out, "Gesamtintegritaet",
+                yesNo(UltimakerTagCodec.isIntegrityValid(uid, decoded)));
 
         appendHeading(out, "ALLE NDEF-RECORDS");
         for (UltimakerTagCodec.DecodedNdefRecord record : decoded.getNdefRecords()) {
@@ -1428,7 +1628,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private String buildRawDump(byte[] memory) {
         StringBuilder out = new StringBuilder(memory.length * 5);
-        out.append("Vollstaendiger gelesener NTAG216-Benutzerspeicher\n")
+        out.append("Gelesener NFC-Datenbereich\n")
                 .append("Seiten 4 bis ")
                 .append(NtagIo.FIRST_USER_PAGE + memory.length / 4 - 1)
                 .append(", ").append(memory.length).append(" Byte\n\n");
@@ -1517,7 +1717,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void toggleRawDump() {
         if (lastRawDumpText.isEmpty()) {
-            setStatus("Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen.");
+            showUserMessage(StatusKind.WARNING,
+                    "Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen.");
             return;
         }
         boolean show = textRawDump.getVisibility() != View.VISIBLE;
@@ -1527,16 +1728,19 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void copyToClipboard(String label, String text) {
         if (text == null || text.isEmpty()) {
-            setStatus("Noch keine Daten zum Kopieren vorhanden.");
+            showUserMessage(StatusKind.WARNING,
+                    "Noch keine Daten zum Kopieren vorhanden.");
             return;
         }
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard == null) {
-            setStatus("Zwischenablage ist auf diesem Geraet nicht verfuegbar.");
+            showUserMessage(StatusKind.WARNING,
+                    "Zwischenablage ist auf diesem Gerät nicht verfügbar.");
             return;
         }
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text));
-        setStatus(label + " wurden in die Zwischenablage kopiert.");
+        showUserMessage(StatusKind.SUCCESS,
+                label + " wurden in die Zwischenablage kopiert.");
     }
 
     private String formatWeight(long milligrams) {
@@ -1641,30 +1845,55 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + " (" + value + " s)";
     }
 
-    private void setStatus(String message) {
-        textStatus.setText(message);
-        if (message == null) {
+    private void setInternalStatus(String message) {
+        if (textStatus != null) {
+            textStatus.setText(message == null ? "" : message);
+        }
+    }
+
+    private void showUserMessage(StatusKind kind, String message) {
+        setInternalStatus(message);
+        if (!isUiUsable() || message == null || message.trim().isEmpty()) {
             return;
         }
-        if (message.startsWith("NFC-Fehler:")) {
-            dismissNfcPrompt();
-            String detail = message.substring("NFC-Fehler:".length()).trim();
-            new AlertDialog.Builder(this)
-                    .setTitle("NFC-Fehler")
-                    .setMessage(detail)
-                    .setPositiveButton("OK", null)
-                    .show();
+        int duration = kind == StatusKind.INFO ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG;
+        Toast.makeText(this, message, duration).show();
+    }
+
+    private void showUserError(String title, String message) {
+        setInternalStatus(message);
+        if (!isUiUsable()) {
             return;
         }
-        if (message.contains("erfolgreich gelesen")
-                || message.contains("geschrieben und bytegenau")
-                || message.contains("Material gespeichert")
-                || message.contains("Material wurde aus der lokalen Bibliothek")
-                || message.contains("Material wurde importiert")
-                || message.contains("Materialien wurden importiert")
-                || message.startsWith("Import fehlgeschlagen")) {
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message == null || message.trim().isEmpty()
+                        ? "Unbekannter Fehler." : message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void postUi(Runnable runnable) {
+        runOnUiThread(() -> {
+            if (isUiUsable()) {
+                runnable.run();
+            }
+        });
+    }
+
+    private boolean isUiUsable() {
+        return !isFinishing() && !isDestroyed();
+    }
+
+    private static String safeExceptionMessage(Throwable exception) {
+        if (exception == null) {
+            return "Unbekannter Fehler.";
         }
+        String message = exception.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return exception.getClass().getSimpleName();
+        }
+        return message.trim();
     }
 
     private void vibrateSuccess() {

@@ -1,4 +1,4 @@
-Spool Maker is a free Android app for reading and writing compatible NTAG216
+Spool Maker is a free Android app for reading and writing compatible NTAG215 and NTAG216
 NFC spool tags.
 
 It can read material and weight information, write new tags, and import

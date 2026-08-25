@@ -16,6 +16,12 @@ Debug:
 ./gradlew assembleDebug
 ```
 
+Tests und Lint wie in CI:
+
+```bash
+./gradlew testDebugUnitTest lintDebug assembleDebug
+```
+
 Release mit bestehendem Update-Schluessel:
 
 1. `signing.properties.example` nach `signing.properties` kopieren.

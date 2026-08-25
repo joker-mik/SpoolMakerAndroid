@@ -32,22 +32,33 @@ jobs:
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle 9.5.0
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '9.5.0'
+
+      - name: Prepare Gradle bootstrap
+        shell: bash
+        run: chmod +x ./gradlew
 
       - name: Show tool versions
         shell: bash
         run: |
           java -version
-          gradle --version
+          ./gradlew --version
           sdkmanager --version
 
-      - name: Build and test
+      - name: Codec standalone self-test
         shell: bash
         run: |
-          gradle --no-daemon testDebugUnitTest assembleDebug
+          rm -rf build/selftest
+          mkdir -p build/selftest
+          javac -d build/selftest \
+            app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java \
+            tools/CodecSelfTest.java
+          java -cp build/selftest CodecSelfTest
+
+      - name: Build, unit test and lint
+        shell: bash
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

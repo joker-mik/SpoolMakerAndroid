@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 public final class MaterialProfile {
+    private static final int MAX_TEXT_CHARS = 256;
     private final String brand;
     private final String material;
     private final String color;
@@ -18,9 +19,9 @@ public final class MaterialProfile {
     }
 
     public MaterialProfile(String brand, String material, String color, String guid, long spoolWeightMg) {
-        this.brand = clean(brand);
-        this.material = clean(material);
-        this.color = clean(color);
+        this.brand = clean(brand, "Hersteller");
+        this.material = clean(material, "Material");
+        this.color = clean(color, "Farbe");
         this.guid = normalizeGuid(guid);
         if (spoolWeightMg < 0 || spoolWeightMg > 0xFFFF_FFFFL) {
             throw new IllegalArgumentException("Spulengewicht liegt ausserhalb des Tagformats.");
@@ -90,7 +91,11 @@ public final class MaterialProfile {
         }
     }
 
-    private static String clean(String value) {
-        return value == null ? "" : value.trim();
+    private static String clean(String value, String fieldName) {
+        String cleaned = value == null ? "" : value.trim();
+        if (cleaned.length() > MAX_TEXT_CHARS) {
+            throw new IllegalArgumentException(fieldName + " ist zu lang.");
+        }
+        return cleaned;
     }
 }

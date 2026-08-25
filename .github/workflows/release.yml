@@ -31,10 +31,32 @@ jobs:
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle 9.5.0
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '9.5.0'
+
+      - name: Prepare Gradle bootstrap
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Verify release tag
+        shell: bash
+        run: |
+          APP_VERSION="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)"
+          test -n "$APP_VERSION" || { echo "versionName could not be read"; exit 1; }
+          test "$GITHUB_REF_NAME" = "v$APP_VERSION" || {
+            echo "Tag $GITHUB_REF_NAME does not match app version v$APP_VERSION"
+            exit 1
+          }
+
+      - name: Codec standalone self-test
+        shell: bash
+        run: |
+          rm -rf build/selftest
+          mkdir -p build/selftest
+          javac -d build/selftest \
+            app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java \
+            tools/CodecSelfTest.java
+          java -cp build/selftest CodecSelfTest
 
       - name: Restore release signing key
         shell: bash
@@ -100,7 +122,7 @@ jobs:
       - name: Build signed release APK
         shell: bash
         run: |
-          gradle --no-daemon clean testDebugUnitTest assembleRelease
+          ./gradlew --no-daemon clean testDebugUnitTest lintRelease assembleRelease
 
       - name: Prepare release files
         id: files

@@ -1,0 +1,1 @@
+Initiale Version 1.2.0: NTAG215/216-Erkennung, Schreibschutz-Pruefung, sicherere NFC-Zustandsfuehrung, gehaerteter Materialimport und strengere Integritaetspruefung.

@@ -1,0 +1,1 @@
+Initial 1.2.0 release: NTAG215/216 detection, write-protection preflight, safer NFC state handling, hardened material import, and stricter integrity validation.

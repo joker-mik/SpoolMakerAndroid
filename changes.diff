@@ -1,474 +1,2735 @@
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/CHANGELOG.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/CHANGELOG.md
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/CHANGELOG.md	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/CHANGELOG.md	2026-08-25 08:49:33.534558758 +0000
-@@ -1,5 +1,13 @@
+diff -ruN '--exclude=changes.diff' a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml	2026-08-25 08:59:07.000000000 +0000
++++ b/.github/workflows/ci.yml	2026-08-25 09:31:17.848491539 +0000
+@@ -32,22 +32,33 @@
+         run: |
+           sdkmanager "platforms;android-36" "build-tools;36.0.0"
+ 
+-      - name: Set up Gradle 9.5.0
++      - name: Set up Gradle cache
+         uses: gradle/actions/setup-gradle@v6
+-        with:
+-          gradle-version: '9.5.0'
++
++      - name: Prepare Gradle bootstrap
++        shell: bash
++        run: chmod +x ./gradlew
+ 
+       - name: Show tool versions
+         shell: bash
+         run: |
+           java -version
+-          gradle --version
++          ./gradlew --version
+           sdkmanager --version
+ 
+-      - name: Build and test
++      - name: Codec standalone self-test
+         shell: bash
+         run: |
+-          gradle --no-daemon testDebugUnitTest assembleDebug
++          rm -rf build/selftest
++          mkdir -p build/selftest
++          javac -d build/selftest \
++            app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java \
++            tools/CodecSelfTest.java
++          java -cp build/selftest CodecSelfTest
++
++      - name: Build, unit test and lint
++        shell: bash
++        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+ 
+       - name: Upload debug APK
+         uses: actions/upload-artifact@v4
+diff -ruN '--exclude=changes.diff' a/.github/workflows/release.yml b/.github/workflows/release.yml
+--- a/.github/workflows/release.yml	2026-08-25 08:59:07.000000000 +0000
++++ b/.github/workflows/release.yml	2026-08-25 09:31:18.294757878 +0000
+@@ -31,10 +31,32 @@
+         run: |
+           sdkmanager "platforms;android-36" "build-tools;36.0.0"
+ 
+-      - name: Set up Gradle 9.5.0
++      - name: Set up Gradle cache
+         uses: gradle/actions/setup-gradle@v6
+-        with:
+-          gradle-version: '9.5.0'
++
++      - name: Prepare Gradle bootstrap
++        shell: bash
++        run: chmod +x ./gradlew
++
++      - name: Verify release tag
++        shell: bash
++        run: |
++          APP_VERSION="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)"
++          test -n "$APP_VERSION" || { echo "versionName could not be read"; exit 1; }
++          test "$GITHUB_REF_NAME" = "v$APP_VERSION" || {
++            echo "Tag $GITHUB_REF_NAME does not match app version v$APP_VERSION"
++            exit 1
++          }
++
++      - name: Codec standalone self-test
++        shell: bash
++        run: |
++          rm -rf build/selftest
++          mkdir -p build/selftest
++          javac -d build/selftest \
++            app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java \
++            tools/CodecSelfTest.java
++          java -cp build/selftest CodecSelfTest
+ 
+       - name: Restore release signing key
+         shell: bash
+@@ -100,7 +122,7 @@
+       - name: Build signed release APK
+         shell: bash
+         run: |
+-          gradle --no-daemon clean testDebugUnitTest assembleRelease
++          ./gradlew --no-daemon clean testDebugUnitTest lintRelease assembleRelease
+ 
+       - name: Prepare release files
+         id: files
+diff -ruN '--exclude=changes.diff' a/BUILDING.md b/BUILDING.md
+--- a/BUILDING.md	2026-08-25 08:59:07.000000000 +0000
++++ b/BUILDING.md	2026-08-25 09:36:31.829169049 +0000
+@@ -16,6 +16,12 @@
+ ./gradlew assembleDebug
+ ```
+ 
++Tests und Lint wie in CI:
++
++```bash
++./gradlew testDebugUnitTest lintDebug assembleDebug
++```
++
+ Release mit bestehendem Update-Schluessel:
+ 
+ 1. `signing.properties.example` nach `signing.properties` kopieren.
+diff -ruN '--exclude=changes.diff' a/CHANGELOG.md b/CHANGELOG.md
+--- a/CHANGELOG.md	2026-08-25 08:59:07.000000000 +0000
++++ b/CHANGELOG.md	2026-08-25 09:32:01.994663755 +0000
+@@ -1,5 +1,20 @@
  # Changelog
  
-+## 1.1.18
++## 1.2.0
 +
-+- Lizenz- und Herkunftshinweise fuer den Android-Port praezisiert.
-+- Upstream-Copyright von Dale Osborne und relevanter Aenderungsstand dokumentiert.
-+- Lizenzseite optisch ueberarbeitet: kompakte Karten fuer Herkunft, Aenderungen, Lizenz und Quellcode.
-+- Vollstaendiger GPL-v3-Text bleibt direkt aus der Lizenzseite erreichbar.
-+- Versionsangaben in App-Ressourcen, README, F-Droid-Vorlage und Release-Dokumentation auf 1.1.18 / 28 vereinheitlicht.
-+
- ## 1.1.17
++- Initiale, gehaertete 1.2-Fassung.
++- Lizenz-, Herkunfts- und Aenderungshinweise aus dem aktualisierten 1.1.18-Stand inhaltlich beibehalten.
++- NTAG215 und NTAG216 werden vor dem Schreiben explizit per `GET_VERSION` erkannt; andere NTAG21x-Typen werden abgewiesen.
++- Tagkapazitaet wird beim Lesen beruecksichtigt: 504 Byte fuer NTAG215, 888 Byte fuer NTAG216.
++- Vor dem ersten Schreibbyte werden statische/dynamische Lock-Bits und Passwortschutz des Zielbereichs geprueft.
++- Schreibdialog bleibt bis nach der Ruecklesepruefung aktiv; Teilabbrueche werden als potenziell teilweise geschriebener Tag gemeldet.
++- Ruecklesepruefung nach dem Schreiben auf die tatsaechlich geschriebenen 228 Byte begrenzt.
++- Gesamtintegritaet prueft jetzt CRC, UID/Serienfeld, Record-Anzahlen, Signaturmarker und das erwartete NDEF-Layout gemeinsam.
++- Materialimport in einen Hintergrund-Executor verschoben und gegen uebergrosse/zu komplexe XML-Dateien sowie DTD/DOCTYPE gehaertet.
++- Materialbibliothek speichert eine letzte gueltige JSON-Sicherung und behandelt beschaedigten Primarbestand nicht mehr still als leer.
++- Sichtbare Status-/Fehlermeldungen von Textpraefix-Heuristiken entkoppelt.
++- Standalone-Codec-Selbsttest aktualisiert; CI verwendet den Projekt-Bootstrap und fuehrt Unit-Tests, Lint und Build aus.
++- Versions- und Formatdokumentation auf `1.2.0` / `versionCode 29` synchronisiert.
+ ## 1.1.18
  
- - Stabiler oeffentlicher Stand auf Basis des getesteten 1.1.16-fix8-UI.
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/NOTICE.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/NOTICE.md
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/NOTICE.md	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/NOTICE.md	2026-08-25 08:49:02.287494428 +0000
-@@ -1,13 +1,48 @@
--# Attribution and notices
-+# Attribution, modification and license notices
- 
--Spool Maker Android is a community Android port based on the behavior and NFC
--spool format implemented by **Spool-Maker** by DA-Osborne:
-+## Project
-+
-+**Spool Maker Android** is a modified Android port / implementation based on the
-+behavior and NFC spool format of **Spool-Maker** by Dale A. Osborne:
- 
- https://github.com/DA-Osborne/Spool-Maker
- 
--The upstream project is distributed under the GNU General Public License
--version 3. This derivative project is distributed under GPL-3.0-or-later. See
--`LICENSE`. Source files carry SPDX identifiers where applicable.
-+The upstream project identifies its author as Dale A. Osborne and contains the
-+notice:
-+
-+> Copyright 2021, Dale Osborne
-+
-+The upstream source states that it is free software under the GNU General Public
-+License, version 3 or (at the user's option) any later version.
-+
-+## Modification notice
-+
-+This repository contains a modified Android version rather than an unmodified
-+copy of the upstream project. Changes include the Android implementation, user
-+interface, Android NFC integration, material-profile handling, validation, and
-+build/release tooling.
-+
-+**Relevant modification date for this source release: 2026-08-25.**
-+
-+Copyright in the Android port and later modifications remains with the
-+respective contributors.
-+
-+This modified project is distributed under **GPL-3.0-or-later**. The complete
-+license text is provided in `LICENSE`. Source files carry SPDX identifiers where
-+applicable.
-+
-+## Upstream provenance
-+
-+The upstream Spool-Maker README states that its GUI/scripts are themselves based
-+on some classes written by GitHub user `gandy92`:
-+
-+https://gist.github.com/gandy92/a7eef12009045f7b3fc01d778c3b79a7
-+
-+This notice records the provenance stated by the upstream project; it does not
-+change or expand the rights granted by any third party.
-+
-+## Trademarks and affiliation
- 
- UltiMaker and Cura are trademarks of their respective owners. This project is
--not endorsed by or affiliated with UltiMaker or DA-Osborne.
-+community software and is not endorsed by or affiliated with UltiMaker,
-+Dale A. Osborne, or the upstream Spool-Maker project.
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/README.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/README.md
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/README.md	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/README.md	2026-08-25 08:49:33.534228879 +0000
-@@ -1,4 +1,4 @@
--# Spool Maker Android 1.1.17
-+# Spool Maker Android 1.1.18
+ - Lizenz- und Herkunftshinweise fuer den Android-Port praezisiert.
+diff -ruN '--exclude=changes.diff' a/README.md b/README.md
+--- a/README.md	2026-08-25 08:59:07.000000000 +0000
++++ b/README.md	2026-08-25 09:32:01.992115175 +0000
+@@ -1,8 +1,9 @@
+-# Spool Maker Android 1.1.18
++# Spool Maker Android 1.2.0
  
  Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
  DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
-@@ -10,7 +10,7 @@
+-Projekt implementierte UltiMaker-kompatible NFC-Spulenformat auf NTAG216-Tags.
++Projekt implementierte UltiMaker-kompatible NFC-Spulenformat auf NTAG215- und
++NTAG216-Tags.
+ 
+ Upstream / technische Grundlage:
+ https://github.com/DA-Osborne/Spool-Maker
+@@ -10,41 +11,44 @@
  Dieses Projekt ist Community-Software und kein offizielles Produkt von
  UltiMaker oder DA-Osborne.
  
--## Stand 1.1.17
-+## Stand 1.1.18
+-## Stand 1.1.18
++## Stand 1.2.0
  
- Der Quellstand fasst die bisher separat gepatchten Funktionen wieder in einem
- normal kompilierbaren Android-Projekt zusammen. Es gibt keine handgebauten
-@@ -40,6 +40,7 @@
- - Seitliches Menue mit Materialeinstellungen, Info und Lizenz; die Version steht
-   fest am unteren Rand.
- - Info und Lizenz sind eigene Seiten mit Zurueck-Navigation statt Popups.
-+- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und einen Zugriff auf den vollstaendigen GPL-Text.
- - Android-Zurueck-Taste/-Geste schliesst zuerst NFC-Dialog, Menue, Detailbereich
-   oder Unterseite. Erst auf der Hauptseite wird die Activity beendet.
- - Einheitlich blau eingefaerbte App-Leisten; grosser dunkelblauer Lesen-/Schreiben-
-@@ -76,8 +77,8 @@
+-Der Quellstand fasst die bisher separat gepatchten Funktionen wieder in einem
+-normal kompilierbaren Android-Projekt zusammen. Es gibt keine handgebauten
+-zusatzlichen DEX-Dateien mehr.
++Version 1.2.0 ist die initiale, gehaertete 1.2-Fassung dieses Android-Ports.
++Die in 1.1.18 aktualisierten Lizenz-, Herkunfts- und Aenderungshinweise wurden
++inhaltlich beibehalten.
+ 
+ Enthalten sind unter anderem:
+ 
+ - NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
+-- Vollstaendiges Lesen des 888-Byte-Benutzerspeichers eines NTAG216.
+-- Dekodierung von Material-, Signatur- und beiden Statusrecords.
+-- Gesamtmenge, Restmenge, Nutzungsdauer, CRC-8, GUID, Batch, Station und weitere
+-  Felder werden ausgelesen.
+-- Schreibvorgang mit bytegenauer Ruecklesepruefung.
+-- Cura/UltiMaker-`.xml.fdm_material`-Import.
++- Explizite Tag-Erkennung per `GET_VERSION`; zugelassen werden NTAG215 und
++  NTAG216.
++- Vollstaendiges Lesen des erkannten Benutzerspeichers: 504 Byte bei NTAG215,
++  888 Byte bei NTAG216.
++- Vor dem Schreiben werden statische Lock-Bits, dynamische Lock-Bits und
++  Passwortschutz fuer den Zielbereich geprueft.
++- Der Schreibdialog bleibt waehrend Schreiben und Verifikation aktiv und warnt
++  davor, den Tag zu entfernen.
++- Nach dem Schreiben werden zuerst exakt die 228 geschriebenen Byte rueckgelesen
++  und bytegenau sowie semantisch verifiziert.
++- Ein abgebrochener Schreibvorgang meldet ausdruecklich, wenn der Tag bereits
++  teilweise veraendert worden sein kann.
++- Dekodierung und Konsistenzpruefung von Material-, Signatur- und beiden
++  Statusrecords inklusive CRC-8, UID/Serienfeld, Signaturmarker und erwartetem
++  Vier-Record-NDEF-Layout.
++- Cura/UltiMaker-`.xml.fdm_material`-Import im Hintergrund mit Begrenzungen fuer
++  Dateigroesse, Dateianzahl und XML-Komplexitaet sowie Ablehnung von DTD/DOCTYPE.
+ - Spulengewicht wird beim Import aus `weight` bzw. kompatiblen Gewichtsfeldern
+   uebernommen und lokal gespeichert.
+-- Im Schreibbereich wird das Material-Spulengewicht vorbelegt; Gesamtmenge und
+-  Restmenge bleiben vor dem Schreiben editierbar.
++- Die Materialbibliothek behaelt beim Speichern eine letzte gueltige JSON-
++  Sicherung und ueberschreibt eine beschaedigte Bibliothek nicht stillschweigend.
+ - Migration der separat gespeicherten Gewichte aus den App-Versionen 1.1.9 bis
+   1.1.15 (`spool_maker_material_weights_v1`).
+ - Materialbibliothek als mehrzeilige Liste mit Symbolbuttons fuer Hinzufuegen,
+   Bearbeiten und Loeschen.
+-- Materialdialog mit beschrifteten Feldern fuer Hersteller, Material, Farbe,
+-  GUID und Spulengewicht.
+-- NFC-Bereitschaft wird als Dialog mit Abbrechen angezeigt statt als dauerhafte
+-  Statusbox.
+-- Seitliches Menue mit Materialeinstellungen, Info und Lizenz; die Version steht
+-  fest am unteren Rand.
+-- Info und Lizenz sind eigene Seiten mit Zurueck-Navigation statt Popups.
+-- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und einen Zugriff auf den vollstaendigen GPL-Text.
+-- Android-Zurueck-Taste/-Geste schliesst zuerst NFC-Dialog, Menue, Detailbereich
+-  oder Unterseite. Erst auf der Hauptseite wird die Activity beendet.
+-- Einheitlich blau eingefaerbte App-Leisten; grosser dunkelblauer Lesen-/Schreiben-
+-  Button am unteren Rand.
++- NFC-Bereitschaft und Schreibfortschritt werden sichtbar angezeigt.
++- Info und Lizenz sind eigene Seiten mit Zurueck-Navigation.
++- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und den
++  vollstaendigen GPL-Text.
+ 
+ ## Projekt oeffnen
+ 
+@@ -54,9 +58,9 @@
+ 4. Gradle-Synchronisierung ausfuehren.
+ 5. Ein echtes Android-Geraet mit NFC verwenden.
+ 
+-Das Projekt ist auf Java 17 eingestellt und verwendet den mitgelieferten
+-Gradle-Bootstrap. Auf einem Rechner mit Internetzugang laedt dieser die in
+-`gradle/wrapper/gradle-wrapper.properties` konfigurierte Gradle-Version.
++Das Projekt ist auf Java 17 eingestellt und verwendet den mitgelieferten,
++checksum-geprueften Gradle-Bootstrap. Auf einem Rechner mit Internetzugang laedt
++dieser die in `gradle/wrapper/gradle-wrapper.properties` konfigurierte Version.
+ 
+ ### Debug-APK
+ 
+@@ -77,24 +81,21 @@
  
  ```text
  applicationId: de.spoolmaker.android
--versionName:   1.1.17
--versionCode:   27
-+versionName:   1.1.18
-+versionCode:   28
+-versionName:   1.1.18
+-versionCode:   28
++versionName:   1.2.0
++versionCode:   29
  ```
  
- Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten.
-@@ -140,7 +141,7 @@
+-Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten.
++Der `versionCode` wurde absichtlich nicht auf 1 zurueckgesetzt, damit eine mit
++Code 28 installierte 1.1.18-Fassung auf 1.2.0 aktualisiert werden kann.
+ 
+-Wenn du den bereits separat bereitgestellten PKCS12-Update-Schluessel verwenden
+-willst, kopiere `signing.properties.example` nach `signing.properties` und trage
+-dort Pfad und Kennwoerter ein. Danach:
++Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten. Fuer einen
++signierten Release-Build `signing.properties.example` nach
++`signing.properties` kopieren, Pfad und Kennwoerter eintragen und danach:
+ 
+ ```bash
+ ./gradlew assembleRelease
+ ```
+ 
+-Ohne `signing.properties` wird der Release-Build nicht mit diesem Update-
+-Schluessel signiert. Eine normal erzeugte Debug-APK kann daher nicht ueber die
+-bereits signierte App installiert werden.
+-
+ ## Codec-Selbsttest ohne Android SDK
+ 
+ Der reine NFC-Codec hat keine Android-Abhaengigkeit:
+@@ -107,6 +108,9 @@
+ java -cp out CodecSelfTest
+ ```
+ 
++Der Selbsttest prueft sowohl NTAG215- als auch NTAG216-grosse Speicherabbilder,
++Record-Layout, CRC und Signaturmarker.
++
+ ## Ordnerstruktur
+ 
+ ```text
+@@ -127,23 +131,30 @@
+ 
+ ## Hinweise zum Tag-Schreiben
+ 
+-Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG216 verwenden.
+-Die App schreibt nur den Benutzerspeicher ab NFC-Seite 4; Hersteller-, Lock-,
+-Passwort- und Konfigurationsseiten werden nicht beschrieben.
++Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG215 oder NTAG216
++verwenden. Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-,
++Passwort- und Konfigurationsseiten werden nur gelesen, nicht beschrieben.
++
++Mehrseitige NFC-EEPROM-Schreibvorgaenge sind nicht atomar. Wird ein Tag waehrend
++des Schreibens aus dem Feld entfernt, kann er teilweise veraendert sein. Die App
++haelt den Schreibdialog deshalb bis zum Ende der Ruecklesepruefung offen und
++weist im Fehlerfall auf diesen Zustand hin.
+ 
+ ## Lizenz
+ 
+ GPL-3.0-or-later. Siehe `LICENSE` und `NOTICE.md`.
+ 
+-
+ ## GitHub Actions und F-Droid
+ 
  Dieses Repository enthaelt Workflows unter `.github/workflows/`:
  
- - `ci.yml` baut und testet bei Pushes und Pull Requests eine Debug-APK.
--- `release.yml` baut bei einem Git-Tag wie `v1.1.17` eine signierte Release-APK
-+- `release.yml` baut bei einem Git-Tag wie `v1.1.18` eine signierte Release-APK
-   und legt sie als GitHub Release ab. Die Signierschluessel werden ausschliesslich
-   ueber GitHub Secrets bereitgestellt und gehoeren niemals ins Repository.
+-- `ci.yml` baut und testet bei Pushes und Pull Requests eine Debug-APK.
+-- `release.yml` baut bei einem Git-Tag wie `v1.1.18` eine signierte Release-APK
+-  und legt sie als GitHub Release ab. Die Signierschluessel werden ausschliesslich
+-  ueber GitHub Secrets bereitgestellt und gehoeren niemals ins Repository.
++- `ci.yml` fuehrt Standalone-Codec-Test, Android-Unit-Tests, Lint und Debug-Build
++  aus.
++- `release.yml` erwartet fuer diesen Stand den Git-Tag `v1.2.0`, prueft die
++  Versionskonsistenz und baut danach eine signierte Release-APK.
++
++Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
++und gehoeren niemals ins Repository.
  
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 08:49:20.326435739 +0000
-@@ -117,6 +117,7 @@
-     private View drawerOverlay;
-     private View secondaryPage;
-     private View materialPage;
-+    private View licensePage;
-     private View textPageScroll;
-     private LinearLayout materialList;
-     private View tabRead;
-@@ -463,6 +464,7 @@
-         drawerOverlay = findViewById(R.id.drawerOverlay);
-         secondaryPage = findViewById(R.id.secondaryPage);
-         materialPage = findViewById(R.id.materialPage);
-+        licensePage = findViewById(R.id.licensePage);
-         textPageScroll = findViewById(R.id.textPageScroll);
-         materialList = findViewById(R.id.materialList);
-         tabRead = findViewById(R.id.tabRead);
-@@ -635,6 +637,7 @@
-             showLicensePage();
-         });
-         findViewById(R.id.buttonPageBack).setOnClickListener(view -> closeSecondaryPage());
-+        findViewById(R.id.buttonLicenseFull).setOnClickListener(view -> showLicenseDialog());
-         configureDrawerAppearance();
-         tabRead.setOnClickListener(view -> selectTab(true));
-         tabWrite.setOnClickListener(view -> selectTab(false));
-@@ -742,6 +745,7 @@
-     private void showMaterialPage() {
-         textPageTitle.setText(R.string.page_materials);
-         materialPage.setVisibility(View.VISIBLE);
-+        licensePage.setVisibility(View.GONE);
-         textPageScroll.setVisibility(View.GONE);
-         renderMaterialLibrary();
-         secondaryPage.setVisibility(View.VISIBLE);
-@@ -750,6 +754,7 @@
-     private void showInfoPage() {
-         textPageTitle.setText(R.string.page_info);
-         materialPage.setVisibility(View.GONE);
-+        licensePage.setVisibility(View.GONE);
-         textPageScroll.setVisibility(View.VISIBLE);
-         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
-         textPageBody.setText(
-@@ -771,14 +776,20 @@
-     private void showLicensePage() {
-         textPageTitle.setText(R.string.page_license);
-         materialPage.setVisibility(View.GONE);
--        textPageScroll.setVisibility(View.VISIBLE);
--        textPageBody.setMovementMethod(null);
--        textPageBody.setTypeface(android.graphics.Typeface.MONOSPACE);
--        try {
--            textPageBody.setText(readRawText(R.raw.gpl_3));
--        } catch (IOException exception) {
--            textPageBody.setText("Lizenztext konnte nicht geladen werden: " + exception.getMessage());
--        }
-+        textPageScroll.setVisibility(View.GONE);
-+        licensePage.setVisibility(View.VISIBLE);
+ F-Droid-Store-Metadaten liegen unter `fastlane/metadata/android/`. Eine Vorlage
+ fuers spaetere `fdroiddata`-Merge-Request liegt unter
+diff -ruN '--exclude=changes.diff' a/VALIDATION.md b/VALIDATION.md
+--- a/VALIDATION.md	2026-08-25 08:59:07.000000000 +0000
++++ b/VALIDATION.md	2026-08-25 09:36:31.370104338 +0000
+@@ -1,42 +1,54 @@
+-# Validierungsbericht — Spool Maker Android 1.1.16
++# Validierungsbericht — Spool Maker Android 1.2.0
+ 
+-Datum: 2026-08-19
++Datum: 2026-08-25
+ 
+ ## Quellstand
+ 
+ - Paketname: `de.spoolmaker.android`
+-- `versionName`: `1.1.16`
+-- `versionCode`: `18`
++- `versionName`: `1.2.0`
++- `versionCode`: `29`
+ - `minSdk`: 23
+ - `targetSdk`: 36
+ - `compileSdk`: 36
+ - Android Gradle Plugin: 9.3.0
+-- Gradle: 9.5.0
++- Gradle-Bootstrap: 9.5.0
+ - Java-Quellziel: 17
+ 
+ ## Durchgefuehrte lokale Pruefungen
+ 
+-- Alle XML-Dateien unter `app/src/main` sind wohlgeformt.
+-- Java-Quellen wurden mit `javac` auf Syntaxfehler gescannt. Erwartete Fehler
+-  wegen der in dieser Laufzeit fehlenden Android-SDK-Klassen wurden ignoriert;
+-  es wurden keine Java-Syntaxfehler gefunden.
+-- Verwendete eigene `R.id`, `R.string`, `R.color` und `R.drawable`-Referenzen
+-  wurden gegen die Projektressourcen abgeglichen.
+-- Der reine Java-NFC-Codec wurde kompiliert und `CodecSelfTest` erfolgreich
+-  ausgefuehrt.
+-- Codec-Selbsttest: 228 Byte Schreibimage, 888 Byte gelesener
+-  NTAG216-Benutzerspeicher, vier NDEF-Records, CRC-/Duplikatpruefungen und
+-  getrennte Gesamt-/Restmenge erfolgreich.
+-- Die Materialbibliothek liest weiterhin das bisherige JSON-Format und kann
+-  zusaetzlich die separat gespeicherten Gewichte aus
+-  `spool_maker_material_weights_v1` uebernehmen.
++- Alle 35 XML-Dateien unter `app/src/main` wurden als wohlgeformtes XML geparst.
++- GitHub-Workflow-YAML und F-Droid-Vorlage wurden mit einem YAML-Parser geladen.
++- `gradlew` wurde mit `sh -n` auf Shell-Syntax geprueft.
++- Der reine Java-NFC-Codec wurde mit `javac -Xlint:all` kompiliert und der
++  aktualisierte `CodecSelfTest` erfolgreich ausgefuehrt.
++- Der Codec-Selbsttest prueft das 228-Byte-Schreibimage sowie 504-Byte-
++  NTAG215- und 888-Byte-NTAG216-Speicherabbilder, NDEF-Layout, CRC,
++  Signaturmarker und Datumscode.
++- Die 17 Testmethoden aus `UltimakerTagCodecTest` und `NtagIoTest` wurden in
++  dieser Umgebung zusaetzlich mit einem kleinen lokalen JUnit-kompatiblen
++  Test-Harness ausgefuehrt; alle 17 liefen erfolgreich.
++- `NtagIo.java` wurde mit minimalen Android-NFC-Stubs separat kompiliert. Ein
++  zusaetzlicher Harness pruefte GET_VERSION-Erkennung fuer NTAG215/216 sowie
++  statische Lock-Bits, dynamische Lock-Bits und AUTH0-Passwordschutz.
++- `MaterialProfile.java` wurde separat mit `javac -Xlint:all` kompiliert.
++- Alle Java-Hauptquellen wurden mit `javac` auf Parser-/Syntaxfehler gescannt.
++  Die erwarteten Symbolfehler wegen fehlender Android-SDK-Klassen blieben
++  bestehen; es wurden keine Java-Parserfehler gefunden.
++- `NOTICE.md`, `LICENSE` und `page_license.xml` sind bytegleich zum vom Nutzer
++  gelieferten Ausgangsstand. Die `license_*`-Strings blieben ebenfalls
++  inhaltlich unveraendert; nur der separate Versionsstring wurde auf 1.2.0
++  gesetzt.
+ 
+ ## Nicht durchgefuehrt
+ 
+-Ein vollstaendiger Android-Gradle-Build konnte in dieser Laufzeit nicht
+-abgeschlossen werden, weil keine Android-SDK-Installation vorhanden ist und der
+-Gradle-Bootstrap wegen fehlender DNS/Netzwerkauflosung die Distribution nicht
+-herunterladen konnte.
+-
+-Der Projektstand ist deshalb fuer Android Studio vorbereitet, aber die erste
+-lokale Kompilierung auf dem eigenen Rechner bleibt ein wichtiger letzter Test.
++Ein vollstaendiger Android-Gradle-Build, Android Lint und die echten Gradle-
++JUnit-Tasks konnten in dieser Laufzeit nicht ausgefuehrt werden. Der
++checksum-gepruefte Gradle-Bootstrap kann `services.gradle.org` wegen fehlender
++DNS-Aufloesung nicht erreichen; ein Android SDK ist lokal ebenfalls nicht
++vorhanden.
 +
-+        TextView version = findViewById(R.id.textLicenseVersion);
-+        version.setText(getString(R.string.license_app_version, BuildConfig.VERSION_NAME));
-+
-+        TextView upstream = findViewById(R.id.textLicenseUpstream);
-+        Linkify.addLinks(upstream, Linkify.WEB_URLS);
-+        upstream.setMovementMethod(LinkMovementMethod.getInstance());
-+
-+        TextView source = findViewById(R.id.textLicenseSource);
-+        Linkify.addLinks(source, Linkify.WEB_URLS);
-+        source.setMovementMethod(LinkMovementMethod.getInstance());
-+
-         secondaryPage.setVisibility(View.VISIBLE);
++Die CI-Konfiguration fuehrt fuer Repository-Builds deshalb explizit
++`CodecSelfTest`, `testDebugUnitTest`, `lintDebug` und `assembleDebug` aus. Der
++Release-Workflow fuehrt den Standalone-Test sowie `testDebugUnitTest`,
++`lintRelease` und `assembleRelease` aus und prueft zusaetzlich, dass der Git-Tag
++zum `versionName` passt.
+diff -ruN '--exclude=changes.diff' a/app/build.gradle b/app/build.gradle
+--- a/app/build.gradle	2026-08-25 08:59:07.000000000 +0000
++++ b/app/build.gradle	2026-08-25 09:30:37.102385526 +0000
+@@ -16,8 +16,8 @@
+         applicationId 'de.spoolmaker.android'
+         minSdk 23
+         targetSdk 36
+-        versionCode 28
+-        versionName '1.1.18'
++        versionCode 29
++        versionName '1.2.0'
+         testInstrumentationRunner 'android.app.InstrumentationTestRunner'
      }
  
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml	1970-01-01 00:00:00.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml	2026-08-25 08:49:02.288201297 +0000
-@@ -0,0 +1,7 @@
-+<?xml version="1.0" encoding="utf-8"?>
-+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-+    <solid android:color="@color/primary_light" />
-+    <stroke android:width="1dp" android:color="@color/primary" />
-+    <corners android:radius="999dp" />
-+    <padding android:left="12dp" android:top="6dp" android:right="12dp" android:bottom="6dp" />
-+</shape>
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml	2026-08-25 08:49:19.697919061 +0000
-@@ -778,6 +778,9 @@
-             </LinearLayout>
-         </LinearLayout>
+diff -ruN '--exclude=changes.diff' a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+--- a/app/src/main/AndroidManifest.xml	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/AndroidManifest.xml	2026-08-25 09:30:37.989880342 +0000
+@@ -11,6 +11,7 @@
  
-+        <include
-+            layout="@layout/page_license" />
+     <application
+         android:allowBackup="true"
++        android:dataExtractionRules="@xml/data_extraction_rules"
+         android:fullBackupContent="@xml/backup_rules"
+         android:icon="@drawable/ic_spool"
+         android:label="@string/app_name"
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/MainActivity.java b/app/src/main/java/de/spoolmaker/android/MainActivity.java
+--- a/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 09:34:10.650764282 +0000
+@@ -54,21 +54,32 @@
+ import java.nio.charset.StandardCharsets;
+ import java.text.DateFormat;
+ import java.util.ArrayList;
+-import java.util.Arrays;
+ import java.util.Calendar;
+ import java.util.Date;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.TimeZone;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.atomic.AtomicBoolean;
+ 
+ public final class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
+     private static final int REQUEST_IMPORT_MATERIAL = 1401;
+-    private static final int READ_BYTES = NtagIo.NTAG216_USER_BYTES;
++    private static final int MAX_IMPORT_FILES = 32;
++    private static final AtomicBoolean NFC_IO_ACTIVE = new AtomicBoolean(false);
+ 
+-    private enum PendingAction {
+-        NONE,
+-        READ,
+-        WRITE
++    private enum NfcState {
++        IDLE,
++        WAITING_READ,
++        WAITING_WRITE,
++        READING,
++        WRITING
++    }
 +
-         <ScrollView
-             android:id="@+id/textPageScroll"
-             android:layout_width="match_parent"
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml	1970-01-01 00:00:00.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml	2026-08-25 08:49:02.289104793 +0000
-@@ -0,0 +1,178 @@
-+<?xml version="1.0" encoding="utf-8"?>
-+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-+    android:id="@+id/licensePage"
-+    android:layout_width="match_parent"
-+    android:layout_height="0dp"
-+    android:layout_weight="1"
-+    android:fillViewport="true"
-+    android:visibility="gone">
++    private enum StatusKind {
++        INFO,
++        SUCCESS,
++        WARNING
+     }
+ 
+     private NfcAdapter nfcAdapter;
+@@ -99,6 +110,7 @@
+     private Button buttonCopyRaw;
+     private ImageButton buttonEdit;
+     private ImageButton buttonDelete;
++    private Button buttonRead;
+     private Button buttonWrite;
+     private Spinner spinnerWriteDateMeaning;
+     private Button buttonWriteDate;
+@@ -129,12 +141,15 @@
+     private TextView textPageTitle;
+     private TextView textPageBody;
+     private AlertDialog nfcPrompt;
++    private TextView nfcPromptMessage;
+     private String selectedLibraryGuid;
+ 
+     private ArrayAdapter<String> materialAdapter;
+     private List<MaterialProfile> materials = new ArrayList<>();
+ 
+-    private volatile PendingAction pendingAction = PendingAction.NONE;
++    private final Object nfcStateLock = new Object();
++    private volatile NfcState nfcState = NfcState.IDLE;
++    private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
+     private volatile MaterialProfile pendingWriteMaterial;
+     private volatile long pendingWriteTotalWeightMg;
+     private volatile long pendingWriteRemainingWeightMg;
+@@ -163,11 +178,13 @@
+             registerModernBackHandler();
+ 
+             if (nfcAdapter == null) {
+-                setStatus("Dieses Android-Ger\u00e4t besitzt keinen kompatiblen NFC-Adapter.");
++                showUserMessage(StatusKind.WARNING,
++                        "Dieses Android-Gerät besitzt keinen kompatiblen NFC-Adapter.");
+             } else if (!nfcAdapter.isEnabled()) {
+-                setStatus("NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst.");
++                showUserMessage(StatusKind.WARNING,
++                        "NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst.");
+             }
+-        } catch (Throwable startupError) {
++        } catch (RuntimeException startupError) {
+             showStartupFailure(startupError);
+         }
+     }
+@@ -270,7 +287,7 @@
+         root.requestApplyInsets();
+     }
+ 
+-    private void showStartupFailure(Throwable startupError) {
++    private void showStartupFailure(RuntimeException startupError) {
+         TextView message = new TextView(this);
+         message.setPadding(32, 32, 32, 32);
+         message.setTextSize(16);
+@@ -287,13 +304,19 @@
+     protected void onResume() {
+         super.onResume();
+         enableReaderMode();
++        updateNfcActionButtons();
+     }
+ 
+     @Override
+     protected void onPause() {
+-        dismissNfcPrompt();
+-        boolean hadPendingAction = pendingAction != PendingAction.NONE;
+-        cancelPendingAction(hadPendingAction);
++        if (isNfcWaiting()) {
++            dismissNfcPrompt();
++            cancelPendingAction(false);
++        } else if (isNfcProcessing()) {
++            // The platform may pause the Activity while a transceive is active. Do not
++            // pretend to cancel an EEPROM write that may already be in progress.
++            dismissNfcPrompt();
++        }
+         if (nfcAdapter != null) {
+             nfcAdapter.disableReaderMode(this);
+         }
+@@ -301,82 +324,124 @@
+     }
+ 
+     @Override
++    protected void onDestroy() {
++        importExecutor.shutdownNow();
++        super.onDestroy();
++    }
 +
-+    <LinearLayout
-+        android:layout_width="match_parent"
-+        android:layout_height="wrap_content"
-+        android:orientation="vertical"
-+        android:paddingStart="16dp"
-+        android:paddingTop="20dp"
-+        android:paddingEnd="16dp"
-+        android:paddingBottom="28dp">
++    @Override
+     public void onTagDiscovered(Tag tag) {
+-        PendingAction action = pendingAction;
+-        if (action == PendingAction.NONE) {
+-            return;
++        final NfcState operation;
++        final MaterialProfile writeMaterial;
++        final long writeTotalWeightMg;
++        final long writeRemainingWeightMg;
++        final UltimakerTagCodec.DateMeaning writeDateMeaning;
++        final long writeDateEpochSeconds;
 +
-+        <LinearLayout
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:background="@drawable/bg_card"
-+            android:orientation="vertical">
++        boolean globalIoAcquired = false;
++        synchronized (nfcStateLock) {
++            if (nfcState == NfcState.WAITING_READ) {
++                operation = NfcState.READING;
++            } else if (nfcState == NfcState.WAITING_WRITE) {
++                operation = NfcState.WRITING;
++            } else {
++                return;
++            }
++            globalIoAcquired = NFC_IO_ACTIVE.compareAndSet(false, true);
++            if (!globalIoAcquired) {
++                nfcState = NfcState.IDLE;
++                clearPendingWriteDataLocked();
++                postUi(() -> {
++                    dismissNfcPrompt();
++                    updateNfcActionButtons();
++                    showUserMessage(StatusKind.WARNING,
++                            "Eine andere NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
++                });
++                return;
++            }
++            nfcState = operation;
++            writeMaterial = pendingWriteMaterial;
++            writeTotalWeightMg = pendingWriteTotalWeightMg;
++            writeRemainingWeightMg = pendingWriteRemainingWeightMg;
++            writeDateMeaning = pendingWriteDateMeaning;
++            writeDateEpochSeconds = pendingWriteDateEpochSeconds;
++            clearPendingWriteDataLocked();
+         }
+ 
+-        runOnUiThread(this::dismissNfcPrompt);
+-
+-        MaterialProfile writeMaterial = pendingWriteMaterial;
+-        long writeTotalWeightMg = pendingWriteTotalWeightMg;
+-        long writeRemainingWeightMg = pendingWriteRemainingWeightMg;
+-        UltimakerTagCodec.DateMeaning writeDateMeaning = pendingWriteDateMeaning;
+-        long writeDateEpochSeconds = pendingWriteDateEpochSeconds;
+-        pendingAction = PendingAction.NONE;
+-        pendingWriteMaterial = null;
+-        pendingWriteTotalWeightMg = 0;
+-        pendingWriteRemainingWeightMg = 0;
+-        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+-        pendingWriteDateEpochSeconds = 0;
+-
+         String uid = NtagIo.formatUid(tag);
+-        runOnUiThread(() -> setStatus("NFC-Tag " + uid + " erkannt. Verarbeitung l\u00e4uft ..."));
++        postUi(() -> updateNfcPromptForProcessing(operation == NfcState.WRITING));
+ 
+         try {
+-            if (action == PendingAction.READ) {
+-                byte[] memory = NtagIo.readUserMemory(tag, READ_BYTES);
++            if (operation == NfcState.READING) {
++                NtagIo.ReadResult readResult = NtagIo.readSupportedUserMemory(tag);
++                byte[] memory = readResult.getUserMemory();
+                 UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(memory);
+-                runOnUiThread(() -> {
++                String model = readResult.getTagInfo().getDisplayName();
++                postUi(() -> {
++                    dismissNfcPrompt();
+                     showDecodedSpool(uid, decoded, memory);
+-                    setStatus("Tag wurde erfolgreich gelesen. Fuer einen neuen Scan den Tag entfernen und erneut anhalten.");
++                    showUserMessage(StatusKind.SUCCESS,
++                            model + " wurde erfolgreich gelesen.");
+                     vibrateSuccess();
+                 });
+                 return;
+             }
+ 
+             if (writeMaterial == null) {
+-                throw new IllegalStateException("Kein Material f\u00fcr den Schreibvorgang ausgew\u00e4hlt.");
++                throw new IllegalStateException("Kein Material für den Schreibvorgang ausgewählt.");
+             }
+ 
+             byte[] encoded = UltimakerTagCodec.encodeSpool(
+                     writeMaterial.getGuid(), uid,
+                     writeTotalWeightMg, writeRemainingWeightMg,
+                     writeDateMeaning, writeDateEpochSeconds);
+-            NtagIo.writeUserMemory(tag, encoded);
+-
+-            byte[] verification = NtagIo.readUserMemory(tag, READ_BYTES);
+-            if (verification.length < encoded.length
+-                    || !Arrays.equals(encoded, Arrays.copyOf(verification, encoded.length))) {
+-                throw new IOException("Die R\u00fccklesepr\u00fcfung stimmt nicht mit den geschriebenen Daten \u00fcberein.");
+-            }
+ 
++            NtagIo.WriteResult writeResult = NtagIo.writeAndVerifyUserMemory(tag, encoded);
++            byte[] verification = writeResult.getVerification();
+             UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(verification);
 +
-+            <TextView
-+                android:id="@+id/textLicenseVersion"
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:textColor="@color/text_primary"
-+                android:textSize="22sp"
-+                android:textStyle="bold" />
+             if (!decoded.getMaterialGuid().equals(writeMaterial.getGuid())
+                     || decoded.getTotalAmount() != writeTotalWeightMg
+                     || decoded.getRemainingAmount() != writeRemainingWeightMg
+-                    || !decoded.isStatusCrcValid()
+-                    || !UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())
++                    || !UltimakerTagCodec.isIntegrityValid(uid, decoded)
+                     || !decoded.isSpoolMakerTag()
+                     || decoded.getDateMeaning() != writeDateMeaning
+                     || (writeDateMeaning != UltimakerTagCodec.DateMeaning.NONE
+                     && Math.round(decoded.getTimeFieldDoubleSeconds()) != writeDateEpochSeconds)) {
+-                throw new IOException("Der Tag wurde gelesen, aber die Inhaltspr\u00fcfung ist fehlgeschlagen.");
++                throw new IOException(
++                        "Der Tag wurde vollständig geschrieben, aber die semantische Inhaltsprüfung ist fehlgeschlagen.");
+             }
+ 
+-            runOnUiThread(() -> {
++            String model = writeResult.getTagInfo().getDisplayName();
++            postUi(() -> {
++                dismissNfcPrompt();
+                 showDecodedSpool(uid, decoded, verification);
+-                setStatus("Tag wurde geschrieben und bytegenau zur\u00fcckgelesen.");
++                showUserMessage(StatusKind.SUCCESS,
++                        model + " wurde geschrieben und über " + verification.length
++                                + " Byte bytegenau verifiziert.");
+                 vibrateSuccess();
+             });
++        } catch (NtagIo.PartialWriteException exception) {
++            String detail = safeExceptionMessage(exception);
++            postUi(() -> {
++                dismissNfcPrompt();
++                showUserError("NFC-Schreibfehler", detail);
++            });
+         } catch (Exception exception) {
+-            String detail = exception.getMessage();
+-            if (detail == null || detail.trim().isEmpty()) {
+-                detail = exception.getClass().getSimpleName();
++            String detail = safeExceptionMessage(exception);
++            postUi(() -> {
++                dismissNfcPrompt();
++                showUserError("NFC-Fehler", detail);
++            });
++        } finally {
++            if (globalIoAcquired) {
++                NFC_IO_ACTIVE.set(false);
++            }
++            synchronized (nfcStateLock) {
++                nfcState = NfcState.IDLE;
++                clearPendingWriteDataLocked();
+             }
+-            String finalDetail = detail;
+-            runOnUiThread(() -> setStatus("NFC-Fehler: " + finalDetail));
++            postUi(this::updateNfcActionButtons);
+         }
+     }
+ 
+@@ -388,11 +453,16 @@
+         }
+ 
+         List<Uri> uris = new ArrayList<>();
++        boolean tooMany = false;
+         ClipData clipData = data.getClipData();
+         if (clipData != null) {
+             for (int index = 0; index < clipData.getItemCount(); index++) {
+                 Uri uri = clipData.getItemAt(index).getUri();
+                 if (uri != null && !uris.contains(uri)) {
++                    if (uris.size() >= MAX_IMPORT_FILES) {
++                        tooMany = true;
++                        break;
++                    }
+                     uris.add(uri);
+                 }
+             }
+@@ -400,36 +470,71 @@
+             uris.add(data.getData());
+         }
+ 
+-        int imported = 0;
++        if (tooMany) {
++            showUserMessage(StatusKind.WARNING,
++                    "Es können höchstens " + MAX_IMPORT_FILES
++                            + " Materialdateien pro Import verarbeitet werden.");
++            return;
++        }
++        if (uris.isEmpty()) {
++            showUserMessage(StatusKind.WARNING, "Keine Materialdatei ausgewählt.");
++            return;
++        }
 +
-+            <TextView
-+                android:layout_width="wrap_content"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="12dp"
-+                android:background="@drawable/bg_license_badge"
-+                android:text="@string/license_badge"
-+                android:textColor="@color/primary_dark"
-+                android:textSize="13sp"
-+                android:textStyle="bold" />
++        showUserMessage(StatusKind.INFO, "Materialimport läuft …");
++        importExecutor.execute(() -> importMaterials(uris));
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="16dp"
-+                android:text="@string/license_intro"
-+                android:textColor="@color/text_secondary"
-+                android:textSize="15sp"
-+                android:lineSpacingExtra="2dp" />
-+        </LinearLayout>
++    private void importMaterials(List<Uri> uris) {
++        List<MaterialProfile> parsedProfiles = new ArrayList<>();
+         List<String> errors = new ArrayList<>();
+-        String lastGuid = null;
 +
-+        <LinearLayout
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:layout_marginTop="14dp"
-+            android:background="@drawable/bg_section"
-+            android:orientation="vertical">
+         for (Uri uri : uris) {
++            if (Thread.currentThread().isInterrupted()) {
++                return;
++            }
+             try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                 if (stream == null) {
+-                    throw new IOException("Datei konnte nicht ge\u00f6ffnet werden.");
++                    throw new IOException("Datei konnte nicht geöffnet werden.");
+                 }
+-                MaterialProfile profile = curaMaterialParser.parse(stream);
+-                materialStore.upsert(profile);
+-                lastGuid = profile.getGuid();
+-                imported++;
++                parsedProfiles.add(curaMaterialParser.parse(stream));
+             } catch (IOException | XmlPullParserException | IllegalArgumentException exception) {
+-                String message = exception.getMessage();
+-                errors.add(message == null ? "Unbekannter Importfehler" : message);
++                errors.add(safeExceptionMessage(exception));
+             }
+         }
+ 
+-        refreshMaterials(lastGuid);
+-        if (imported > 0 && errors.isEmpty()) {
+-            setStatus(imported + (imported == 1
+-                    ? " Material wurde importiert."
+-                    : " Materialien wurden importiert."));
+-        } else if (imported > 0) {
+-            setStatus(imported + " Materialdatei(en) importiert; " + errors.size()
+-                    + " Datei(en) konnten nicht gelesen werden. Erster Fehler: " + errors.get(0));
+-        } else {
+-            setStatus("Import fehlgeschlagen: "
+-                    + (errors.isEmpty() ? "Keine Datei ausgew\u00e4hlt." : errors.get(0)));
++        if (!parsedProfiles.isEmpty()) {
++            try {
++                materialStore.upsertAll(parsedProfiles);
++            } catch (RuntimeException exception) {
++                errors.add("Materialbibliothek konnte nicht gespeichert werden: "
++                        + safeExceptionMessage(exception));
++                parsedProfiles.clear();
++            }
+         }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:text="@string/license_origin_title"
-+                android:textColor="@color/text_primary"
-+                android:textSize="17sp"
-+                android:textStyle="bold" />
++        final int imported = parsedProfiles.size();
++        final String lastGuid = imported == 0 ? null
++                : parsedProfiles.get(imported - 1).getGuid();
++        final String firstError = errors.isEmpty() ? null : errors.get(0);
++        final int errorCount = errors.size();
 +
-+            <TextView
-+                android:id="@+id/textLicenseUpstream"
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="8dp"
-+                android:text="@string/license_origin_body"
-+                android:textColor="@color/text_secondary"
-+                android:textIsSelectable="true"
-+                android:textSize="15sp"
-+                android:lineSpacingExtra="2dp" />
-+        </LinearLayout>
++        postUi(() -> {
++            refreshMaterials(lastGuid);
++            if (imported > 0 && errorCount == 0) {
++                showUserMessage(StatusKind.SUCCESS, imported == 1
++                        ? "1 Material wurde importiert."
++                        : imported + " Materialien wurden importiert.");
++            } else if (imported > 0) {
++                showUserMessage(StatusKind.WARNING,
++                        imported + " Materialdatei(en) importiert; " + errorCount
++                                + " Datei(en) konnten nicht verarbeitet werden. Erster Fehler: "
++                                + firstError);
++            } else {
++                showUserError("Import fehlgeschlagen",
++                        firstError == null ? "Keine Datei konnte importiert werden." : firstError);
++            }
++        });
+     }
+ 
+     private void bindViews() {
+@@ -457,6 +562,7 @@
+         buttonCopyRaw = findViewById(R.id.buttonCopyRaw);
+         buttonEdit = findViewById(R.id.buttonEdit);
+         buttonDelete = findViewById(R.id.buttonDelete);
++        buttonRead = findViewById(R.id.buttonRead);
+         buttonWrite = findViewById(R.id.buttonWrite);
+         readPage = findViewById(R.id.readPage);
+         writePage = findViewById(R.id.writePage);
+@@ -608,7 +714,7 @@
+         });
+         buttonDelete.setOnClickListener(view -> confirmDeleteSelectedMaterial());
+         findViewById(R.id.buttonImport).setOnClickListener(view -> launchMaterialImport());
+-        findViewById(R.id.buttonRead).setOnClickListener(view -> armRead());
++        buttonRead.setOnClickListener(view -> armRead());
+         buttonWrite.setOnClickListener(view -> confirmAndArmWrite());
+         findViewById(R.id.buttonCancel).setOnClickListener(view -> cancelPendingAction(true));
+         buttonToggleRaw.setOnClickListener(view -> toggleRawDump());
+@@ -716,7 +822,7 @@
+     private void selectTab(boolean read) {
+         readPage.setVisibility(read ? View.VISIBLE : View.GONE);
+         writePage.setVisibility(read ? View.GONE : View.VISIBLE);
+-        findViewById(R.id.buttonRead).setVisibility(read ? View.VISIBLE : View.GONE);
++        buttonRead.setVisibility(read ? View.VISIBLE : View.GONE);
+         buttonWrite.setVisibility(read ? View.GONE : View.VISIBLE);
+         tabRead.setBackgroundResource(read ? R.drawable.bg_tab_selected : android.R.color.transparent);
+         tabWrite.setBackgroundResource(read ? android.R.color.transparent : R.drawable.bg_tab_selected);
+@@ -854,15 +960,15 @@
+         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+         body.addView(icon, iconParams);
+ 
+-        TextView text = new TextView(this);
+-        text.setText(write
+-                ? "Beschreibbaren NFC-Tag an die NFC-Antenne des Smartphones halten."
+-                : "NFC-Tag an die NFC-Antenne des Smartphones halten.");
+-        text.setTextSize(19f);
+-        text.setTextColor(getColor(R.color.text_primary));
+-        text.setGravity(android.view.Gravity.CENTER);
+-        text.setPadding(0, dp(18), 0, dp(6));
+-        body.addView(text);
++        nfcPromptMessage = new TextView(this);
++        nfcPromptMessage.setText(write
++                ? "Beschreibbaren NTAG215 oder NTAG216 an die NFC-Antenne halten."
++                : "NTAG215 oder NTAG216 an die NFC-Antenne halten.");
++        nfcPromptMessage.setTextSize(19f);
++        nfcPromptMessage.setTextColor(getColor(R.color.text_primary));
++        nfcPromptMessage.setGravity(android.view.Gravity.CENTER);
++        nfcPromptMessage.setPadding(0, dp(18), 0, dp(6));
++        body.addView(nfcPromptMessage);
+ 
+         nfcPrompt = new AlertDialog.Builder(this)
+                 .setTitle(write ? "NFC-Tag schreiben" : "NFC-Tag lesen")
+@@ -874,15 +980,37 @@
+         nfcPrompt.show();
+     }
+ 
++    private void updateNfcPromptForProcessing(boolean write) {
++        if (nfcPrompt == null || !nfcPrompt.isShowing()) {
++            return;
++        }
++        nfcPrompt.setTitle(write ? "NFC-Tag wird geschrieben" : "NFC-Tag wird gelesen");
++        if (nfcPromptMessage != null) {
++            nfcPromptMessage.setText(write
++                    ? "Tag erkannt. Typ und Schreibschutz werden geprüft, danach wird geschrieben und verifiziert. Tag nicht entfernen."
++                    : "Tag erkannt. Typ und Speicher werden geprüft und gelesen. Tag nicht entfernen.");
++        }
++        nfcPrompt.setCancelable(false);
++        Button negative = nfcPrompt.getButton(AlertDialog.BUTTON_NEGATIVE);
++        if (negative != null) {
++            negative.setEnabled(false);
++            negative.setVisibility(View.GONE);
++        }
++    }
 +
-+        <LinearLayout
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:layout_marginTop="14dp"
-+            android:background="@drawable/bg_section"
-+            android:orientation="vertical">
+     private void dismissNfcPrompt() {
+         if (nfcPrompt != null) {
+             nfcPrompt.dismiss();
+             nfcPrompt = null;
++            nfcPromptMessage = null;
+         }
+     }
+ 
+     private boolean handleBackNavigation() {
+         if (nfcPrompt != null && nfcPrompt.isShowing()) {
++            if (isNfcProcessing()) {
++                return true;
++            }
+             dismissNfcPrompt();
+             cancelPendingAction(false);
+             return true;
+@@ -937,7 +1065,7 @@
+         spinnerMaterial.setEnabled(hasMaterials);
+         buttonEdit.setEnabled(hasMaterials);
+         buttonDelete.setEnabled(hasMaterials);
+-        buttonWrite.setEnabled(hasMaterials);
++        updateNfcActionButtons();
+ 
+         if (hasMaterials && selectedGuid != null) {
+             for (int index = 0; index < materials.size(); index++) {
+@@ -1015,12 +1143,14 @@
+                                 editColor.getText().toString(),
+                                 editGuid.getText().toString(),
+                                 spoolWeightMg);
+-                        if (existing != null && !existing.getGuid().equals(profile.getGuid())) {
+-                            materialStore.remove(existing.getGuid());
++                        if (existing != null) {
++                            materialStore.replace(existing.getGuid(), profile);
++                        } else {
++                            materialStore.upsert(profile);
+                         }
+-                        materialStore.upsert(profile);
+                         refreshMaterials(profile.getGuid());
+-                        setStatus("Material gespeichert: " + profile.getDisplayName());
++                        showUserMessage(StatusKind.SUCCESS,
++                                "Material gespeichert: " + profile.getDisplayName());
+                         dialog.dismiss();
+                     } catch (IllegalArgumentException exception) {
+                         String message = exception.getMessage();
+@@ -1029,6 +1159,8 @@
+                         } else {
+                             editGuid.setError(message);
+                         }
++                    } catch (RuntimeException exception) {
++                        showUserError("Speichern fehlgeschlagen", safeExceptionMessage(exception));
+                     }
+                 });
+         });
+@@ -1045,9 +1177,14 @@
+                 .setMessage(profile.getDisplayName() + "\n" + profile.getGuid())
+                 .setNegativeButton("Abbrechen", null)
+                 .setPositiveButton("L\u00f6schen", (dialog, which) -> {
+-                    materialStore.remove(profile.getGuid());
+-                    refreshMaterials(null);
+-                    setStatus("Material wurde aus der lokalen Bibliothek gel\u00f6scht.");
++                    try {
++                        materialStore.remove(profile.getGuid());
++                        refreshMaterials(null);
++                        showUserMessage(StatusKind.SUCCESS,
++                                "Material wurde aus der lokalen Bibliothek gelöscht.");
++                    } catch (RuntimeException exception) {
++                        showUserError("Löschen fehlgeschlagen", safeExceptionMessage(exception));
++                    }
+                 })
+                 .show();
+     }
+@@ -1067,13 +1204,16 @@
+         if (!ensureNfcReady()) {
+             return;
+         }
+-        pendingWriteMaterial = null;
+-        pendingWriteTotalWeightMg = 0;
+-        pendingWriteRemainingWeightMg = 0;
+-        pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+-        pendingWriteDateEpochSeconds = 0;
+-        pendingAction = PendingAction.READ;
+-        setStatus("Lesen ist aktiviert.");
++        synchronized (nfcStateLock) {
++            if (nfcState != NfcState.IDLE) {
++                showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
++                return;
++            }
++            clearPendingWriteDataLocked();
++            nfcState = NfcState.WAITING_READ;
++        }
++        updateNfcActionButtons();
++        setInternalStatus("Lesen ist aktiviert.");
+         showNfcPrompt(false);
+     }
+ 
+@@ -1083,7 +1223,8 @@
+         }
+         MaterialProfile profile = getSelectedMaterial();
+         if (profile == null) {
+-            setStatus("Vor dem Schreiben muss ein Material angelegt oder importiert werden.");
++            showUserMessage(StatusKind.WARNING,
++                    "Vor dem Schreiben muss ein Material angelegt oder importiert werden.");
+             return;
+         }
+ 
+@@ -1130,20 +1271,29 @@
+                 + "Gesamtmenge: " + formatWeight(totalWeightMg) + "\n"
+                 + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n"
+                 + "Filament-Datum: " + dateSummary + "\n\n"
+-                + "Der vorhandene Spuleninhalt wird ueberschrieben. Gesperrte Tags koennen nicht beschrieben werden.";
++                + "Der vorhandene Spuleninhalt wird überschrieben. Zugelassen sind NTAG215 und NTAG216. "
++                + "Tag-Typ, Lock-Bits und Passwortschutz werden vor dem ersten Schreibbyte geprüft.";
+ 
+         new AlertDialog.Builder(this)
+                 .setTitle("NFC-Tag schreiben?")
+                 .setMessage(message)
+                 .setNegativeButton("Abbrechen", null)
+                 .setPositiveButton("Schreiben aktivieren", (dialog, which) -> {
+-                    pendingWriteMaterial = profile;
+-                    pendingWriteTotalWeightMg = totalWeightMg;
+-                    pendingWriteRemainingWeightMg = remainingWeightMg;
+-                    pendingWriteDateMeaning = meaning;
+-                    pendingWriteDateEpochSeconds = dateEpochSeconds;
+-                    pendingAction = PendingAction.WRITE;
+-                    setStatus("Schreiben ist aktiviert.");
++                    synchronized (nfcStateLock) {
++                        if (nfcState != NfcState.IDLE) {
++                            showUserMessage(StatusKind.WARNING,
++                                    "Es läuft bereits eine NFC-Aktion.");
++                            return;
++                        }
++                        pendingWriteMaterial = profile;
++                        pendingWriteTotalWeightMg = totalWeightMg;
++                        pendingWriteRemainingWeightMg = remainingWeightMg;
++                        pendingWriteDateMeaning = meaning;
++                        pendingWriteDateEpochSeconds = dateEpochSeconds;
++                        nfcState = NfcState.WAITING_WRITE;
++                    }
++                    updateNfcActionButtons();
++                    setInternalStatus("Schreiben ist aktiviert.");
+                     showNfcPrompt(true);
+                 })
+                 .show();
+@@ -1179,15 +1329,25 @@
+     }
+ 
+     private boolean ensureNfcReady() {
++        if (NFC_IO_ACTIVE.get()) {
++            showUserMessage(StatusKind.WARNING,
++                    "Eine NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
++            return false;
++        }
++        if (isNfcProcessing() || isNfcWaiting()) {
++            showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
++            return false;
++        }
+         if (nfcAdapter == null) {
+-            setStatus("Dieses Ger\u00e4t besitzt keinen kompatiblen NFC-Adapter.");
++            showUserMessage(StatusKind.WARNING,
++                    "Dieses Gerät besitzt keinen kompatiblen NFC-Adapter.");
+             return false;
+         }
+         if (!nfcAdapter.isEnabled()) {
+-            setStatus("NFC ist deaktiviert.");
++            setInternalStatus("NFC ist deaktiviert.");
+             new AlertDialog.Builder(this)
+                     .setTitle("NFC aktivieren")
+-                    .setMessage("Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zur\u00fcck.")
++                    .setMessage("Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zurück.")
+                     .setNegativeButton("Abbrechen", null)
+                     .setPositiveButton("Einstellungen", (dialog, which) -> openNfcSettings())
+                     .show();
+@@ -1199,7 +1359,7 @@
+     private void openNfcSettings() {
+         try {
+             startActivity(new Intent(Settings.ACTION_NFC_SETTINGS));
+-        } catch (Exception ignored) {
++        } catch (android.content.ActivityNotFoundException ignored) {
+             startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+         }
+     }
+@@ -1217,15 +1377,50 @@
+     }
+ 
+     private void cancelPendingAction(boolean updateStatus) {
+-        pendingAction = PendingAction.NONE;
++        synchronized (nfcStateLock) {
++            if (nfcState == NfcState.READING || nfcState == NfcState.WRITING) {
++                if (updateStatus) {
++                    showUserMessage(StatusKind.WARNING,
++                            "Die laufende NFC-Kommunikation kann nicht sicher abgebrochen werden.");
++                }
++                return;
++            }
++            nfcState = NfcState.IDLE;
++            clearPendingWriteDataLocked();
++        }
++        dismissNfcPrompt();
++        updateNfcActionButtons();
++        if (updateStatus) {
++            showUserMessage(StatusKind.INFO, "NFC-Aktion wurde abgebrochen.");
++        }
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:text="@string/license_modification_title"
-+                android:textColor="@color/text_primary"
-+                android:textSize="17sp"
-+                android:textStyle="bold" />
++    private void clearPendingWriteDataLocked() {
+         pendingWriteMaterial = null;
+         pendingWriteTotalWeightMg = 0;
+         pendingWriteRemainingWeightMg = 0;
+         pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
+         pendingWriteDateEpochSeconds = 0;
+-        if (updateStatus) {
+-            setStatus("NFC-Aktion wurde abgebrochen.");
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="8dp"
-+                android:text="@string/license_modification_body"
-+                android:textColor="@color/text_secondary"
-+                android:textSize="15sp"
-+                android:lineSpacingExtra="2dp" />
-+        </LinearLayout>
++    private boolean isNfcWaiting() {
++        NfcState state = nfcState;
++        return state == NfcState.WAITING_READ || state == NfcState.WAITING_WRITE;
++    }
 +
-+        <LinearLayout
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:layout_marginTop="14dp"
-+            android:background="@drawable/bg_section"
-+            android:orientation="vertical">
++    private boolean isNfcProcessing() {
++        NfcState state = nfcState;
++        return state == NfcState.READING || state == NfcState.WRITING;
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:text="@string/license_terms_title"
-+                android:textColor="@color/text_primary"
-+                android:textSize="17sp"
-+                android:textStyle="bold" />
++    private void updateNfcActionButtons() {
++        if (buttonRead == null || buttonWrite == null) {
++            return;
+         }
++        boolean idle = nfcState == NfcState.IDLE;
++        boolean nfcReady = nfcAdapter != null && nfcAdapter.isEnabled();
++        buttonRead.setEnabled(idle && nfcReady);
++        buttonWrite.setEnabled(idle && nfcReady && !materials.isEmpty());
+     }
+ 
+     private long parseWeightMg(String raw, boolean allowZero) {
+@@ -1288,15 +1483,16 @@
+                 + " (" + decoded.getStationId() + ")");
+ 
+         boolean uidMatches = UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial());
+-        boolean integrityOk = decoded.isStatusCrcValid()
+-                && uidMatches
+-                && decoded.getMaterialRecordCount() == 1
+-                && decoded.getStatusRecordCount() == 2;
++        boolean expectedLayout = UltimakerTagCodec.hasExpectedNdefLayout(decoded);
++        boolean integrityOk = UltimakerTagCodec.isIntegrityValid(uid, decoded);
+         String integrity = "CRC-8 " + (decoded.isStatusCrcValid() ? "gueltig" : "UNGUELTIG")
+                 + ", aktiv Status " + decoded.getActiveStatusRecordIndex()
+                 + ", UID/Serial " + (uidMatches ? "OK" : "ABWEICHEND")
++                + ", Materialrecords " + decoded.getMaterialRecordCount()
++                + ", Signaturrecords " + decoded.getSignatureRecordCount()
+                 + ", Statusrecords " + decoded.getStatusRecordCount()
+                 + (decoded.isDuplicateStatusMatches() ? " (bytegleich)" : " (unterschiedlich, normal moeglich)")
++                + ", Layout " + (expectedLayout ? "OK" : "ABWEICHEND")
+                 + ", Sig-Marker " + (decoded.hasExpectedSigMarker() ? "0x2000" : "fehlt/abweichend");
+         textCrc.setText(getString(R.string.label_crc) + ": " + integrity);
+         textCrc.setTextColor(getColor(integrityOk ? R.color.accent_dark : R.color.danger));
+@@ -1325,8 +1521,8 @@
+         appendHeading(out, "TAG UND NDEF");
+         appendValue(out, "Chip-UID", uid);
+         appendValue(out, "Materialrecord-Serienfeld", emptyAsMarker(decoded.getSerial()));
+-        appendValue(out, "Gelesener Benutzerspeicher", decoded.getReadMemoryLength() + " Byte");
+-        appendValue(out, "Speicherseiten", "NTAG-Seite 4 bis "
++        appendValue(out, "An Decoder uebergebener Datenbereich", decoded.getReadMemoryLength() + " Byte");
++        appendValue(out, "Datenbereich", "NTAG-Seite 4 bis "
+                 + (NtagIo.FIRST_USER_PAGE + decoded.getReadMemoryLength() / 4 - 1));
+         appendValue(out, "NDEF-Ablage", decoded.isTlvWrapped()
+                 ? "NFC-Forum-Type-2-TLV" : "roher NDEF-Bytestrom ab Seite 4");
+@@ -1403,6 +1599,10 @@
+         appendValue(out, "UID entspricht Serienfeld",
+                 yesNo(UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())));
+         appendValue(out, "Sig-Marker 0x2000 vorhanden", yesNo(decoded.hasExpectedSigMarker()));
++        appendValue(out, "Erwartetes Vier-Record-NDEF-Layout",
++                yesNo(UltimakerTagCodec.hasExpectedNdefLayout(decoded)));
++        appendValue(out, "Gesamtintegritaet",
++                yesNo(UltimakerTagCodec.isIntegrityValid(uid, decoded)));
+ 
+         appendHeading(out, "ALLE NDEF-RECORDS");
+         for (UltimakerTagCodec.DecodedNdefRecord record : decoded.getNdefRecords()) {
+@@ -1428,7 +1628,7 @@
+ 
+     private String buildRawDump(byte[] memory) {
+         StringBuilder out = new StringBuilder(memory.length * 5);
+-        out.append("Vollstaendiger gelesener NTAG216-Benutzerspeicher\n")
++        out.append("Gelesener NFC-Datenbereich\n")
+                 .append("Seiten 4 bis ")
+                 .append(NtagIo.FIRST_USER_PAGE + memory.length / 4 - 1)
+                 .append(", ").append(memory.length).append(" Byte\n\n");
+@@ -1517,7 +1717,8 @@
+ 
+     private void toggleRawDump() {
+         if (lastRawDumpText.isEmpty()) {
+-            setStatus("Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen.");
++            showUserMessage(StatusKind.WARNING,
++                    "Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen.");
+             return;
+         }
+         boolean show = textRawDump.getVisibility() != View.VISIBLE;
+@@ -1527,16 +1728,19 @@
+ 
+     private void copyToClipboard(String label, String text) {
+         if (text == null || text.isEmpty()) {
+-            setStatus("Noch keine Daten zum Kopieren vorhanden.");
++            showUserMessage(StatusKind.WARNING,
++                    "Noch keine Daten zum Kopieren vorhanden.");
+             return;
+         }
+         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+         if (clipboard == null) {
+-            setStatus("Zwischenablage ist auf diesem Geraet nicht verfuegbar.");
++            showUserMessage(StatusKind.WARNING,
++                    "Zwischenablage ist auf diesem Gerät nicht verfügbar.");
+             return;
+         }
+         clipboard.setPrimaryClip(ClipData.newPlainText(label, text));
+-        setStatus(label + " wurden in die Zwischenablage kopiert.");
++        showUserMessage(StatusKind.SUCCESS,
++                label + " wurden in die Zwischenablage kopiert.");
+     }
+ 
+     private String formatWeight(long milligrams) {
+@@ -1641,30 +1845,55 @@
+                 + " (" + value + " s)";
+     }
+ 
+-    private void setStatus(String message) {
+-        textStatus.setText(message);
+-        if (message == null) {
++    private void setInternalStatus(String message) {
++        if (textStatus != null) {
++            textStatus.setText(message == null ? "" : message);
++        }
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="8dp"
-+                android:text="@string/license_terms_body"
-+                android:textColor="@color/text_secondary"
-+                android:textSize="15sp"
-+                android:lineSpacingExtra="2dp" />
-+        </LinearLayout>
++    private void showUserMessage(StatusKind kind, String message) {
++        setInternalStatus(message);
++        if (!isUiUsable() || message == null || message.trim().isEmpty()) {
+             return;
+         }
+-        if (message.startsWith("NFC-Fehler:")) {
+-            dismissNfcPrompt();
+-            String detail = message.substring("NFC-Fehler:".length()).trim();
+-            new AlertDialog.Builder(this)
+-                    .setTitle("NFC-Fehler")
+-                    .setMessage(detail)
+-                    .setPositiveButton("OK", null)
+-                    .show();
++        int duration = kind == StatusKind.INFO ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG;
++        Toast.makeText(this, message, duration).show();
++    }
 +
-+        <LinearLayout
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:layout_marginTop="14dp"
-+            android:background="@drawable/bg_section"
-+            android:orientation="vertical">
++    private void showUserError(String title, String message) {
++        setInternalStatus(message);
++        if (!isUiUsable()) {
+             return;
+         }
+-        if (message.contains("erfolgreich gelesen")
+-                || message.contains("geschrieben und bytegenau")
+-                || message.contains("Material gespeichert")
+-                || message.contains("Material wurde aus der lokalen Bibliothek")
+-                || message.contains("Material wurde importiert")
+-                || message.contains("Materialien wurden importiert")
+-                || message.startsWith("Import fehlgeschlagen")) {
+-            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
++        new AlertDialog.Builder(this)
++                .setTitle(title)
++                .setMessage(message == null || message.trim().isEmpty()
++                        ? "Unbekannter Fehler." : message)
++                .setPositiveButton("OK", null)
++                .show();
++    }
 +
-+            <TextView
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:text="@string/license_source_title"
-+                android:textColor="@color/text_primary"
-+                android:textSize="17sp"
-+                android:textStyle="bold" />
++    private void postUi(Runnable runnable) {
++        runOnUiThread(() -> {
++            if (isUiUsable()) {
++                runnable.run();
++            }
++        });
++    }
 +
-+            <TextView
-+                android:id="@+id/textLicenseSource"
-+                android:layout_width="match_parent"
-+                android:layout_height="wrap_content"
-+                android:layout_marginTop="8dp"
-+                android:text="@string/license_source_body"
-+                android:textColor="@color/primary"
-+                android:textIsSelectable="true"
-+                android:textSize="15sp" />
-+        </LinearLayout>
++    private boolean isUiUsable() {
++        return !isFinishing() && !isDestroyed();
++    }
 +
-+        <Button
-+            android:id="@+id/buttonLicenseFull"
-+            android:layout_width="match_parent"
-+            android:layout_height="64dp"
-+            android:layout_marginTop="18dp"
-+            android:background="@drawable/bg_primary_button"
-+            android:text="@string/button_license_full"
-+            android:textAllCaps="false"
-+            android:textColor="@color/on_primary"
-+            android:textSize="16sp"
-+            android:textStyle="bold" />
++    private static String safeExceptionMessage(Throwable exception) {
++        if (exception == null) {
++            return "Unbekannter Fehler.";
++        }
++        String message = exception.getMessage();
++        if (message == null || message.trim().isEmpty()) {
++            return exception.getClass().getSimpleName();
+         }
++        return message.trim();
+     }
+ 
+     private void vibrateSuccess() {
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/model/MaterialProfile.java b/app/src/main/java/de/spoolmaker/android/model/MaterialProfile.java
+--- a/app/src/main/java/de/spoolmaker/android/model/MaterialProfile.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/model/MaterialProfile.java	2026-08-25 09:24:03.466068743 +0000
+@@ -7,6 +7,7 @@
+ import java.util.UUID;
+ 
+ public final class MaterialProfile {
++    private static final int MAX_TEXT_CHARS = 256;
+     private final String brand;
+     private final String material;
+     private final String color;
+@@ -18,9 +19,9 @@
+     }
+ 
+     public MaterialProfile(String brand, String material, String color, String guid, long spoolWeightMg) {
+-        this.brand = clean(brand);
+-        this.material = clean(material);
+-        this.color = clean(color);
++        this.brand = clean(brand, "Hersteller");
++        this.material = clean(material, "Material");
++        this.color = clean(color, "Farbe");
+         this.guid = normalizeGuid(guid);
+         if (spoolWeightMg < 0 || spoolWeightMg > 0xFFFF_FFFFL) {
+             throw new IllegalArgumentException("Spulengewicht liegt ausserhalb des Tagformats.");
+@@ -90,7 +91,11 @@
+         }
+     }
+ 
+-    private static String clean(String value) {
+-        return value == null ? "" : value.trim();
++    private static String clean(String value, String fieldName) {
++        String cleaned = value == null ? "" : value.trim();
++        if (cleaned.length() > MAX_TEXT_CHARS) {
++            throw new IllegalArgumentException(fieldName + " ist zu lang.");
++        }
++        return cleaned;
+     }
+ }
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/nfc/NtagIo.java b/app/src/main/java/de/spoolmaker/android/nfc/NtagIo.java
+--- a/app/src/main/java/de/spoolmaker/android/nfc/NtagIo.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/nfc/NtagIo.java	2026-08-25 09:33:43.661757914 +0000
+@@ -6,77 +6,176 @@
+ 
+ import java.io.ByteArrayOutputStream;
+ import java.io.IOException;
++import java.util.Arrays;
+ import java.util.Locale;
+ 
+ public final class NtagIo {
+     public static final int FIRST_USER_PAGE = 4;
++    public static final int NTAG215_USER_BYTES = 504;
+     public static final int NTAG216_USER_BYTES = 888;
+ 
+     private static final int READ_COMMAND = 0x30;
+     private static final int WRITE_COMMAND = 0xA2;
++    private static final int GET_VERSION_COMMAND = 0x60;
+     private static final int ACK = 0x0A;
++    private static final int IO_TIMEOUT_MS = 2000;
+ 
+     private NtagIo() {
+     }
+ 
+-    public static byte[] readUserMemory(Tag tag, int byteCount) throws IOException {
+-        if (byteCount <= 0 || byteCount > NTAG216_USER_BYTES) {
+-            throw new IllegalArgumentException("Ung\u00fcltige Leselaenge.");
++    public enum TagModel {
++        NTAG215("NTAG215", NTAG215_USER_BYTES, 130, 131),
++        NTAG216("NTAG216", NTAG216_USER_BYTES, 226, 227);
 +
-+        <TextView
-+            android:layout_width="match_parent"
-+            android:layout_height="wrap_content"
-+            android:layout_marginTop="12dp"
-+            android:gravity="center"
-+            android:text="@string/license_notice_footer"
-+            android:textColor="@color/text_secondary"
-+            android:textSize="12sp" />
++        private final String displayName;
++        private final int userBytes;
++        private final int dynamicLockPage;
++        private final int configPage;
 +
-+    </LinearLayout>
-+</ScrollView>
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml	2026-08-25 08:49:19.063176552 +0000
-@@ -25,8 +25,21 @@
-     <string name="menu_license">Lizenz</string>
++        TagModel(String displayName, int userBytes, int dynamicLockPage, int configPage) {
++            this.displayName = displayName;
++            this.userBytes = userBytes;
++            this.dynamicLockPage = dynamicLockPage;
++            this.configPage = configPage;
+         }
+-        NfcA technology = NfcA.get(tag);
+-        if (technology == null) {
+-            throw new IOException("Der Tag stellt keine NFC-A-Technologie bereit.");
++
++        public String getDisplayName() {
++            return displayName;
+         }
+ 
+-        try {
+-            technology.connect();
+-            technology.setTimeout(1500);
+-            ByteArrayOutputStream output = new ByteArrayOutputStream(byteCount);
+-            int page = FIRST_USER_PAGE;
+-            while (output.size() < byteCount) {
+-                byte[] response = technology.transceive(new byte[]{(byte) READ_COMMAND, (byte) page});
+-                if (response == null || response.length < 16) {
+-                    throw new IOException("Unvollstaendige Antwort beim Lesen von Seite " + page + ".");
+-                }
+-                int remaining = byteCount - output.size();
+-                output.write(response, 0, Math.min(response.length, remaining));
+-                page += 4;
+-            }
+-            return output.toByteArray();
+-        } finally {
+-            try {
+-                technology.close();
+-            } catch (IOException ignored) {
+-                // Preserve the original exception, if any.
+-            }
++        public int getUserBytes() {
++            return userBytes;
++        }
++
++        int getDynamicLockPage() {
++            return dynamicLockPage;
++        }
++
++        int getConfigPage() {
++            return configPage;
+         }
+     }
+ 
+-    public static void writeUserMemory(Tag tag, byte[] data) throws IOException {
+-        if (data == null || data.length == 0 || data.length % 4 != 0) {
+-            throw new IllegalArgumentException("Schreibdaten muessen ein nichtleeres Vielfaches von vier Bytes sein.");
++    public static final class TagInfo {
++        private final TagModel model;
++        private final byte[] versionResponse;
++
++        private TagInfo(TagModel model, byte[] versionResponse) {
++            this.model = model;
++            this.versionResponse = Arrays.copyOf(versionResponse, versionResponse.length);
+         }
+-        if (data.length > NTAG216_USER_BYTES) {
+-            throw new IllegalArgumentException("Die Daten sind groesser als der NTAG216-Benutzerspeicher.");
++
++        public TagModel getModel() {
++            return model;
+         }
+ 
+-        NfcA technology = NfcA.get(tag);
+-        if (technology == null) {
+-            throw new IOException("Der Tag stellt keine NFC-A-Technologie bereit.");
++        public int getUserBytes() {
++            return model.getUserBytes();
++        }
++
++        public String getDisplayName() {
++            return model.getDisplayName();
++        }
++
++        public byte[] getVersionResponse() {
++            return Arrays.copyOf(versionResponse, versionResponse.length);
++        }
++    }
++
++    public static final class ReadResult {
++        private final TagInfo tagInfo;
++        private final byte[] userMemory;
++
++        private ReadResult(TagInfo tagInfo, byte[] userMemory) {
++            this.tagInfo = tagInfo;
++            this.userMemory = userMemory;
++        }
++
++        public TagInfo getTagInfo() {
++            return tagInfo;
++        }
++
++        public byte[] getUserMemory() {
++            return Arrays.copyOf(userMemory, userMemory.length);
++        }
++    }
++
++    public static final class WriteResult {
++        private final TagInfo tagInfo;
++        private final byte[] verification;
++
++        private WriteResult(TagInfo tagInfo, byte[] verification) {
++            this.tagInfo = tagInfo;
++            this.verification = verification;
+         }
+ 
++        public TagInfo getTagInfo() {
++            return tagInfo;
++        }
++
++        public byte[] getVerification() {
++            return Arrays.copyOf(verification, verification.length);
++        }
++    }
++
++    public static final class PartialWriteException extends IOException {
++        private static final long serialVersionUID = 1L;
++        private final int completedPages;
++
++        private PartialWriteException(String message, int completedPages, Throwable cause) {
++            super(message, cause);
++            this.completedPages = completedPages;
++        }
++
++        public int getCompletedPages() {
++            return completedPages;
++        }
++
++        public boolean tagMayBePartiallyChanged() {
++            return completedPages > 0;
++        }
++    }
++
++    /**
++     * Detects a supported NTAG and reads exactly its user-memory area.
++     */
++    public static ReadResult readSupportedUserMemory(Tag tag) throws IOException {
++        NfcA technology = requireTechnology(tag);
+         try {
+-            technology.connect();
+-            technology.setTimeout(1500);
++            connect(technology);
++            TagInfo tagInfo = inspectConnectedTag(technology);
++            byte[] memory = readBytes(technology, FIRST_USER_PAGE, tagInfo.getUserBytes());
++            return new ReadResult(tagInfo, memory);
++        } finally {
++            closeQuietly(technology);
++        }
++    }
+ 
+-            int finalPage = FIRST_USER_PAGE + data.length / 4 - 1;
+-            int probePage = Math.max(FIRST_USER_PAGE, finalPage - 3);
+-            byte[] capacityProbe = technology.transceive(
+-                    new byte[]{(byte) READ_COMMAND, (byte) probePage});
+-            if (capacityProbe == null || capacityProbe.length < 16) {
+-                throw new IOException("Der Tag-Speicher ist f\u00fcr die Spulendaten zu klein.");
++    /**
++     * Performs all safe preflight checks, writes complete pages, and verifies only
++     * the bytes that were actually written. The connection remains open for the
++     * complete preflight/write/verify sequence to minimize the critical NFC window.
++     */
++    public static WriteResult writeAndVerifyUserMemory(Tag tag, byte[] data) throws IOException {
++        validateWriteData(data);
++
++        NfcA technology = requireTechnology(tag);
++        int completedPages = 0;
++        try {
++            connect(technology);
++            TagInfo tagInfo = inspectConnectedTag(technology);
++            if (data.length > tagInfo.getUserBytes()) {
++                throw new IOException("Die Spulendaten passen nicht in "
++                        + tagInfo.getDisplayName() + ".");
+             }
+ 
++            int finalPage = FIRST_USER_PAGE + data.length / 4 - 1;
++            preflightWritableRange(technology, tagInfo, FIRST_USER_PAGE, finalPage);
++
++            // Verify that the complete target range can be read while the tag is still
++            // unchanged. This catches removal/read protection before the first write.
++            readBytes(technology, FIRST_USER_PAGE, data.length);
++
+             for (int offset = 0; offset < data.length; offset += 4) {
+                 int page = FIRST_USER_PAGE + offset / 4;
+                 byte[] command = new byte[]{
+@@ -88,21 +187,224 @@
+                         data[offset + 3]
+                 };
+                 byte[] response = technology.transceive(command);
+-                if (response == null || response.length == 0 || (response[0] & 0x0F) != ACK) {
++                if (!isAck(response)) {
+                     throw new IOException("Tag verweigert Schreibzugriff auf Seite " + page + ".");
+                 }
++                completedPages++;
+             }
++
++            byte[] verification = readBytes(technology, FIRST_USER_PAGE, data.length);
++            if (!Arrays.equals(data, verification)) {
++                throw new IOException("Die Rückleseprüfung stimmt nicht mit den geschriebenen Daten überein.");
++            }
++            return new WriteResult(tagInfo, verification);
++        } catch (IOException exception) {
++            if (completedPages > 0) {
++                throw new PartialWriteException(
++                        "Der Schreibvorgang wurde nach " + completedPages
++                                + " von " + (data.length / 4)
++                                + " Seiten unterbrochen. Der Tag kann teilweise verändert sein. "
++                                + safeMessage(exception),
++                        completedPages,
++                        exception);
++            }
++            throw exception;
+         } finally {
+-            try {
+-                technology.close();
+-            } catch (IOException ignored) {
+-                // Preserve the original exception, if any.
++            closeQuietly(technology);
++        }
++    }
++
++    private static void preflightWritableRange(NfcA technology, TagInfo tagInfo,
++                                                int firstPage, int lastPage) throws IOException {
++        byte[] page2Block = readFourPages(technology, 2);
++        byte[] dynamicLockBlock = readFourPages(technology,
++                tagInfo.getModel().getDynamicLockPage());
++        byte[] configBlock = readFourPages(technology,
++                tagInfo.getModel().getConfigPage());
++
++        String reason = findWriteProtectionReason(
++                tagInfo, firstPage, lastPage, page2Block, dynamicLockBlock, configBlock);
++        if (reason != null) {
++            throw new IOException(reason);
++        }
++    }
++
++    static String findWriteProtectionReason(TagInfo tagInfo, int firstPage, int lastPage,
++                                            byte[] page2Block, byte[] dynamicLockBlock,
++                                            byte[] configBlock) {
++        if (tagInfo == null) {
++            return "Tag-Typ konnte nicht bestimmt werden.";
++        }
++        if (firstPage < FIRST_USER_PAGE || lastPage < firstPage) {
++            return "Ungültiger Schreibbereich.";
++        }
++        if (page2Block == null || page2Block.length < 4
++                || dynamicLockBlock == null || dynamicLockBlock.length < 3
++                || configBlock == null || configBlock.length < 8) {
++            return "Lock- oder Konfigurationsdaten des Tags konnten nicht vollständig gelesen werden.";
++        }
++
++        int lockByte0 = page2Block[2] & 0xFF;
++        int lockByte1 = page2Block[3] & 0xFF;
++        for (int page = Math.max(firstPage, 4); page <= Math.min(lastPage, 15); page++) {
++            boolean locked;
++            if (page <= 7) {
++                locked = (lockByte0 & (1 << page)) != 0;
++            } else {
++                locked = (lockByte1 & (1 << (page - 8))) != 0;
++            }
++            if (locked) {
++                return "Seite " + page + " ist durch die statischen Lock-Bits schreibgeschützt.";
+             }
+         }
++
++        for (int page = Math.max(firstPage, 16); page <= lastPage; page++) {
++            int group = (page - 16) / 16;
++            boolean locked;
++            if (group < 8) {
++                locked = (dynamicLockBlock[0] & (1 << group)) != 0;
++            } else {
++                int bit = group - 8;
++                locked = bit < 6 && (dynamicLockBlock[1] & (1 << bit)) != 0;
++            }
++            if (locked) {
++                int groupStart = 16 + group * 16;
++                int groupEnd = Math.min(groupStart + 15,
++                        FIRST_USER_PAGE + tagInfo.getUserBytes() / 4 - 1);
++                return "Der Bereich Seite " + groupStart + " bis " + groupEnd
++                        + " ist durch dynamische Lock-Bits schreibgeschützt.";
++            }
++        }
++
++        // Configuration page byte 3 is AUTH0. Password verification is required
++        // for writes starting at this page, independent of the PROT read setting.
++        int auth0 = configBlock[3] & 0xFF;
++        if (auth0 <= lastPage) {
++            return "Der Schreibbereich ist ab Seite " + auth0
++                    + " durch Passwortschutz geschützt.";
++        }
++
++        return null;
++    }
++
++    private static TagInfo inspectConnectedTag(NfcA technology) throws IOException {
++        byte[] response = technology.transceive(new byte[]{(byte) GET_VERSION_COMMAND});
++        return parseVersionResponse(response);
++    }
++
++    static TagInfo parseVersionResponse(byte[] response) throws IOException {
++        if (response == null || response.length < 8) {
++            throw new IOException("Tag-Typ konnte nicht über GET_VERSION bestimmt werden. "
++                    + "Unterstützt werden NTAG215 und NTAG216.");
++        }
++
++        int header = response[0] & 0xFF;
++        int vendorId = response[1] & 0xFF;
++        int productType = response[2] & 0xFF;
++        int productSubtype = response[3] & 0xFF;
++        int majorVersion = response[4] & 0xFF;
++        int minorVersion = response[5] & 0xFF;
++        int storageSize = response[6] & 0xFF;
++        int protocolType = response[7] & 0xFF;
++
++        boolean ntag21xSignature = header == 0x00
++                && vendorId == 0x04
++                && productType == 0x04
++                && productSubtype == 0x02
++                && majorVersion == 0x01
++                && minorVersion == 0x00
++                && protocolType == 0x03;
++        if (!ntag21xSignature) {
++            throw new IOException("Der erkannte NFC-A-Tag ist kein unterstützter NTAG215/NTAG216.");
++        }
++
++        TagModel model;
++        if (storageSize == 0x11) {
++            model = TagModel.NTAG215;
++        } else if (storageSize == 0x13) {
++            model = TagModel.NTAG216;
++        } else {
++            throw new IOException("Nicht unterstützte NTAG21x-Speichergröße 0x"
++                    + String.format(Locale.US, "%02X", storageSize)
++                    + ". Unterstützt werden NTAG215 und NTAG216.");
++        }
++        return new TagInfo(model, Arrays.copyOf(response, 8));
++    }
++
++    private static byte[] readBytes(NfcA technology, int startPage, int byteCount)
++            throws IOException {
++        if (byteCount <= 0 || byteCount % 4 != 0) {
++            throw new IllegalArgumentException("Leselänge muss ein positives Vielfaches von vier Bytes sein.");
++        }
++        ByteArrayOutputStream output = new ByteArrayOutputStream(byteCount);
++        int page = startPage;
++        while (output.size() < byteCount) {
++            byte[] response = readFourPages(technology, page);
++            int remaining = byteCount - output.size();
++            output.write(response, 0, Math.min(response.length, remaining));
++            page += 4;
++        }
++        return output.toByteArray();
++    }
++
++    private static byte[] readFourPages(NfcA technology, int page) throws IOException {
++        byte[] response = technology.transceive(
++                new byte[]{(byte) READ_COMMAND, (byte) page});
++        if (response == null || response.length < 16) {
++            throw new IOException("Unvollständige Antwort beim Lesen ab Seite " + page + ".");
++        }
++        return response;
++    }
++
++    private static void validateWriteData(byte[] data) {
++        if (data == null || data.length == 0 || data.length % 4 != 0) {
++            throw new IllegalArgumentException(
++                    "Schreibdaten müssen ein nichtleeres Vielfaches von vier Bytes sein.");
++        }
++        if (data.length > NTAG216_USER_BYTES) {
++            throw new IllegalArgumentException(
++                    "Die Daten sind größer als der unterstützte NTAG216-Benutzerspeicher.");
++        }
++    }
++
++    private static NfcA requireTechnology(Tag tag) throws IOException {
++        if (tag == null) {
++            throw new IOException("Kein NFC-Tag vorhanden.");
++        }
++        NfcA technology = NfcA.get(tag);
++        if (technology == null) {
++            throw new IOException("Der Tag stellt keine NFC-A-Technologie bereit.");
++        }
++        return technology;
++    }
++
++    private static void connect(NfcA technology) throws IOException {
++        technology.connect();
++        technology.setTimeout(IO_TIMEOUT_MS);
++    }
++
++    private static boolean isAck(byte[] response) {
++        return response != null && response.length > 0 && (response[0] & 0x0F) == ACK;
++    }
++
++    private static void closeQuietly(NfcA technology) {
++        try {
++            technology.close();
++        } catch (IOException ignored) {
++            // Preserve the original exception, if any.
++        }
++    }
++
++    private static String safeMessage(Throwable throwable) {
++        String message = throwable == null ? null : throwable.getMessage();
++        if (message == null || message.trim().isEmpty()) {
++            return throwable == null ? "Unbekannter NFC-Fehler." : throwable.getClass().getSimpleName();
++        }
++        return message;
+     }
+ 
+     public static String formatUid(Tag tag) {
+-        byte[] id = tag.getId();
++        byte[] id = tag == null ? null : tag.getId();
+         if (id == null || id.length == 0) {
+             return "";
+         }
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java b/app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java
+--- a/app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java	2026-08-25 09:24:21.564826580 +0000
+@@ -111,7 +111,7 @@
+         String serial = sanitizeSerial(uidHex);
+         if (serial.length() != 14) {
+             throw new IllegalArgumentException(
+-                    "NTAG216-UID muss als 7 Byte bzw. 14 Hex-Zeichen vorliegen.");
++                    "NTAG215/216-UID muss als 7 Byte bzw. 14 Hex-Zeichen vorliegen.");
+         }
+ 
+         double dateSeconds = dateMeaning == DateMeaning.NONE
+@@ -315,6 +315,46 @@
+         return uid.length() == 14 && stored.length() == 14 && uid.equals(stored);
+     }
+ 
++    /**
++     * Returns true only for the four-record UltiMaker spool layout expected by
++     * this app: material, signature marker, status, status copy.
++     */
++    public static boolean hasExpectedNdefLayout(DecodedSpool decoded) {
++        if (decoded == null || decoded.getNdefRecords().size() != 4) {
++            return false;
++        }
++        List<DecodedNdefRecord> records = decoded.getNdefRecords();
++        return matchesRecord(records.get(0), 0x9C, TNF_EXTERNAL_TYPE,
++                "ultimaker.nl:material", "1", MATERIAL_PAYLOAD_LENGTH)
++                && matchesRecord(records.get(1), 0x11, TNF_WELL_KNOWN,
++                "Sig", "", 2)
++                && matchesRecord(records.get(2), 0x1C, TNF_EXTERNAL_TYPE,
++                "ultimaker.nl:stat", "2", STATUS_PAYLOAD_LENGTH)
++                && matchesRecord(records.get(3), 0x5C, TNF_EXTERNAL_TYPE,
++                "ultimaker.nl:stat", "2", STATUS_PAYLOAD_LENGTH);
++    }
++
++    public static boolean isIntegrityValid(String uidHex, DecodedSpool decoded) {
++        return decoded != null
++                && decoded.isStatusCrcValid()
++                && uidMatchesSerial(uidHex, decoded.getSerial())
++                && decoded.getMaterialRecordCount() == 1
++                && decoded.getSignatureRecordCount() == 1
++                && decoded.getStatusRecordCount() == 2
++                && decoded.hasExpectedSigMarker()
++                && hasExpectedNdefLayout(decoded);
++    }
++
++    private static boolean matchesRecord(DecodedNdefRecord record, int flags, int tnf,
++                                         String type, String id, int payloadLength) {
++        return record != null
++                && record.getFlags() == flags
++                && record.getTnf() == tnf
++                && type.equals(record.getType())
++                && id.equals(record.getIdText())
++                && record.getPayloadLength() == payloadLength;
++    }
++
+     public static String toHex(byte[] bytes) {
+         if (bytes == null || bytes.length == 0) {
+             return "";
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/storage/MaterialStore.java b/app/src/main/java/de/spoolmaker/android/storage/MaterialStore.java
+--- a/app/src/main/java/de/spoolmaker/android/storage/MaterialStore.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/storage/MaterialStore.java	2026-08-25 09:33:29.535284163 +0000
+@@ -18,6 +18,7 @@
+ public final class MaterialStore {
+     private static final String PREFS_NAME = "spool_maker_materials";
+     private static final String KEY_MATERIALS = "materials_v1";
++    private static final String KEY_MATERIALS_BACKUP = "materials_v1_backup";
+ 
+     private final SharedPreferences preferences;
+     private final SharedPreferences legacyWeightPreferences;
+@@ -59,14 +60,52 @@
+     }
+ 
+     public synchronized void upsert(MaterialProfile profile) {
++        if (profile == null) {
++            throw new IllegalArgumentException("Materialprofil fehlt.");
++        }
++        List<MaterialProfile> one = new ArrayList<>();
++        one.add(profile);
++        upsertAll(one);
++    }
++
++    public synchronized void upsertAll(List<MaterialProfile> incoming) {
++        if (incoming == null || incoming.isEmpty()) {
++            return;
++        }
++        List<MaterialProfile> profiles = load();
++        for (MaterialProfile profile : incoming) {
++            if (profile == null) {
++                continue;
++            }
++            for (int index = profiles.size() - 1; index >= 0; index--) {
++                if (profiles.get(index).getGuid().equals(profile.getGuid())) {
++                    profiles.remove(index);
++                }
++            }
++            profiles.add(profile);
++        }
++        save(profiles);
++    }
++
++    public synchronized void replace(String previousGuid, MaterialProfile replacement) {
++        if (replacement == null) {
++            throw new IllegalArgumentException("Materialprofil fehlt.");
++        }
++        String normalizedPrevious = MaterialProfile.normalizeGuid(previousGuid);
+         List<MaterialProfile> profiles = load();
+         for (int index = profiles.size() - 1; index >= 0; index--) {
+-            if (profiles.get(index).getGuid().equals(profile.getGuid())) {
++            String guid = profiles.get(index).getGuid();
++            if (guid.equals(normalizedPrevious) || guid.equals(replacement.getGuid())) {
+                 profiles.remove(index);
+             }
+         }
+-        profiles.add(profile);
++        profiles.add(replacement);
+         save(profiles);
++
++        if (!normalizedPrevious.equals(replacement.getGuid())
++                && !legacyWeightPreferences.edit().remove(normalizedPrevious).commit()) {
++            throw new IllegalStateException("Altes Materialgewicht konnte nicht entfernt werden.");
++        }
+     }
+ 
+     public synchronized void remove(String guid) {
+@@ -78,48 +117,109 @@
+             }
+         }
+         save(profiles);
+-        legacyWeightPreferences.edit().remove(normalized).apply();
++        if (!legacyWeightPreferences.edit().remove(normalized).commit()) {
++            throw new IllegalStateException("Altes Materialgewicht konnte nicht entfernt werden.");
++        }
+     }
+ 
+     private List<MaterialProfile> load() {
+-        List<MaterialProfile> result = new ArrayList<>();
+         String raw = preferences.getString(KEY_MATERIALS, "[]");
+         try {
+-            JSONArray array = new JSONArray(raw);
+-            for (int index = 0; index < array.length(); index++) {
+-                JSONObject item = array.optJSONObject(index);
+-                if (item == null) {
+-                    continue;
++            return parse(raw);
++        } catch (JSONException primaryError) {
++            String backup = preferences.getString(KEY_MATERIALS_BACKUP, null);
++            if (backup == null) {
++                throw new IllegalStateException(
++                        "Die lokale Materialbibliothek ist beschädigt und es gibt keine Sicherung.",
++                        primaryError);
++            }
++            try {
++                List<MaterialProfile> recovered = parse(backup);
++                if (!preferences.edit().putString(KEY_MATERIALS, backup).commit()) {
++                    throw new IllegalStateException(
++                            "Die Materialbibliothek wurde aus der Sicherung gelesen, konnte aber nicht wiederhergestellt werden.");
+                 }
+-                try {
+-                    String guid = item.optString("guid", "");
+-                    long storedWeight = Math.max(0L, item.optLong("spoolWeightMg", 0L));
+-                    if (storedWeight == 0L) {
+-                        try {
+-                            String normalized = MaterialProfile.normalizeGuid(guid);
+-                            storedWeight = Math.max(0L, legacyWeightPreferences.getLong(normalized, 0L));
+-                        } catch (IllegalArgumentException ignored) {
+-                            // The constructor below will reject an invalid GUID.
+-                        }
++                return recovered;
++            } catch (JSONException backupError) {
++                IllegalStateException failure = new IllegalStateException(
++                        "Die lokale Materialbibliothek und ihre Sicherung sind beschädigt.",
++                        primaryError);
++                failure.addSuppressed(backupError);
++                throw failure;
++            }
++        }
++    }
++
++    private List<MaterialProfile> parse(String raw) throws JSONException {
++        List<MaterialProfile> result = new ArrayList<>();
++        JSONArray array = new JSONArray(raw == null ? "[]" : raw);
++        for (int index = 0; index < array.length(); index++) {
++            JSONObject item = array.optJSONObject(index);
++            if (item == null) {
++                continue;
++            }
++            try {
++                String guid = item.optString("guid", "");
++                long storedWeight = Math.max(0L, item.optLong("spoolWeightMg", 0L));
++                if (storedWeight == 0L) {
++                    try {
++                        String normalized = MaterialProfile.normalizeGuid(guid);
++                        storedWeight = Math.max(0L,
++                                legacyWeightPreferences.getLong(normalized, 0L));
++                    } catch (IllegalArgumentException ignored) {
++                        // The constructor below will reject an invalid GUID.
+                     }
+-                    result.add(new MaterialProfile(
+-                            item.optString("brand", ""),
+-                            item.optString("material", ""),
+-                            item.optString("color", ""),
+-                            guid,
+-                            storedWeight
+-                    ));
+-                } catch (IllegalArgumentException ignored) {
+-                    // Ignore damaged entries instead of making the whole library unusable.
+                 }
++                result.add(new MaterialProfile(
++                        item.optString("brand", ""),
++                        item.optString("material", ""),
++                        item.optString("color", ""),
++                        guid,
++                        storedWeight
++                ));
++            } catch (IllegalArgumentException ignored) {
++                // A single malformed profile must not make valid profiles unavailable.
+             }
+-        } catch (JSONException ignored) {
+-            // A damaged preference is treated as an empty library.
+         }
+         return result;
+     }
+ 
+     private void save(List<MaterialProfile> profiles) {
++        String serialized = serialize(profiles);
++        String current = preferences.getString(KEY_MATERIALS, null);
++
++        SharedPreferences.Editor editor = preferences.edit();
++        if (current != null && isJsonArray(current)) {
++            editor.putString(KEY_MATERIALS_BACKUP, current);
++        }
++        editor.putString(KEY_MATERIALS, serialized);
++        if (!editor.commit()) {
++            throw new IllegalStateException("Materialbibliothek konnte nicht gespeichert werden.");
++        }
++
++        SharedPreferences.Editor legacyEditor = legacyWeightPreferences.edit();
++        for (MaterialProfile profile : profiles) {
++            if (profile.getSpoolWeightMg() > 0) {
++                legacyEditor.putLong(profile.getGuid(), profile.getSpoolWeightMg());
++            } else {
++                legacyEditor.remove(profile.getGuid());
++            }
++        }
++        if (!legacyEditor.commit()) {
++            throw new IllegalStateException("Materialgewichte konnten nicht gespeichert werden.");
++        }
++    }
++
++    private static boolean isJsonArray(String raw) {
++        try {
++            new JSONArray(raw);
++            return true;
++        } catch (JSONException ignored) {
++            return false;
++        }
++    }
++
++    private static String serialize(List<MaterialProfile> profiles) {
+         JSONArray array = new JSONArray();
+         for (MaterialProfile profile : profiles) {
+             JSONObject item = new JSONObject();
+@@ -131,19 +231,10 @@
+                 item.put("spoolWeightMg", profile.getSpoolWeightMg());
+                 array.put(item);
+             } catch (JSONException exception) {
+-                throw new IllegalStateException("Materialbibliothek konnte nicht serialisiert werden.", exception);
+-            }
+-        }
+-        preferences.edit().putString(KEY_MATERIALS, array.toString()).apply();
+-
+-        SharedPreferences.Editor legacyEditor = legacyWeightPreferences.edit();
+-        for (MaterialProfile profile : profiles) {
+-            if (profile.getSpoolWeightMg() > 0) {
+-                legacyEditor.putLong(profile.getGuid(), profile.getSpoolWeightMg());
+-            } else {
+-                legacyEditor.remove(profile.getGuid());
++                throw new IllegalStateException(
++                        "Materialbibliothek konnte nicht serialisiert werden.", exception);
+             }
+         }
+-        legacyEditor.apply();
++        return array.toString();
+     }
+ }
+diff -ruN '--exclude=changes.diff' a/app/src/main/java/de/spoolmaker/android/util/CuraMaterialParser.java b/app/src/main/java/de/spoolmaker/android/util/CuraMaterialParser.java
+--- a/app/src/main/java/de/spoolmaker/android/util/CuraMaterialParser.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/java/de/spoolmaker/android/util/CuraMaterialParser.java	2026-08-25 09:37:28.309816050 +0000
+@@ -7,6 +7,7 @@
+ import org.xmlpull.v1.XmlPullParserException;
+ import org.xmlpull.v1.XmlPullParserFactory;
+ 
++import java.io.FilterInputStream;
+ import java.io.IOException;
+ import java.io.InputStream;
+ import java.math.BigDecimal;
+@@ -14,13 +15,28 @@
+ import java.util.Locale;
+ 
+ public final class CuraMaterialParser {
++    public static final long MAX_INPUT_BYTES = 2L * 1024L * 1024L;
++
+     private static final long MAX_UNSIGNED_INT = 0xFFFF_FFFFL;
++    private static final int MAX_XML_DEPTH = 64;
++    private static final int MAX_START_TAGS = 20_000;
++    private static final int MAX_FIELD_CHARS = 4096;
++    private static final String FEATURE_DISALLOW_DOCTYPE =
++            "http://apache.org/xml/features/disallow-doctype-decl";
+ 
+     public MaterialProfile parse(InputStream inputStream) throws IOException, XmlPullParserException {
++        if (inputStream == null) {
++            throw new IllegalArgumentException("Kein XML-Datenstrom vorhanden.");
++        }
++
+         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+         factory.setNamespaceAware(true);
++        hardenFactory(factory);
++
+         XmlPullParser parser = factory.newPullParser();
+-        parser.setInput(inputStream, "UTF-8");
++        parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false);
++        parser.setFeature(XmlPullParser.FEATURE_VALIDATION, false);
++        parser.setInput(new LimitedInputStream(inputStream, MAX_INPUT_BYTES), "UTF-8");
+ 
+         String brand = "";
+         String material = "";
+@@ -28,11 +44,36 @@
+         String color = "";
+         String guid = "";
+         long spoolWeightMg = 0L;
++        int startTags = 0;
++        boolean rootSeen = false;
+ 
+         int event = parser.getEventType();
+         while (event != XmlPullParser.END_DOCUMENT) {
++            if (event == XmlPullParser.DOCDECL) {
++                throw new XmlPullParserException(
++                        "DOCTYPE/DTD ist in Materialdateien nicht zugelassen.", parser, null);
++            }
+             if (event == XmlPullParser.START_TAG) {
++                startTags++;
++                if (startTags > MAX_START_TAGS) {
++                    throw new XmlPullParserException(
++                            "Materialdatei enthält zu viele XML-Elemente.", parser, null);
++                }
++                if (parser.getDepth() > MAX_XML_DEPTH) {
++                    throw new XmlPullParserException(
++                            "Materialdatei ist zu tief verschachtelt.", parser, null);
++                }
++
+                 String name = parser.getName();
++                if (!rootSeen) {
++                    if (parser.getDepth() != 1 || name == null
++                            || !"fdmmaterial".equalsIgnoreCase(name)) {
++                        throw new XmlPullParserException(
++                                "Die Datei ist kein Cura/UltiMaker-fdmmaterial-Dokument.",
++                                parser, null);
++                    }
++                    rootSeen = true;
++                }
+                 if (name != null) {
+                     String key = name.toLowerCase(Locale.US);
+                     if ("brand".equals(key) && brand.isEmpty()) {
+@@ -41,7 +82,8 @@
+                         material = safeNextText(parser);
+                     } else if ("description".equals(key) && description.isEmpty()) {
+                         description = safeNextText(parser);
+-                    } else if (("color".equals(key) || "colour".equals(key) || "color_name".equals(key)) && color.isEmpty()) {
++                    } else if (("color".equals(key) || "colour".equals(key)
++                            || "color_name".equals(key)) && color.isEmpty()) {
+                         color = safeNextText(parser);
+                     } else if ("guid".equals(key) && guid.isEmpty()) {
+                         guid = safeNextText(parser);
+@@ -49,20 +91,29 @@
+                         spoolWeightMg = parseWeightMgOrZero(safeNextText(parser));
+                     } else if (spoolWeightMg == 0L && "setting".equals(key)) {
+                         String settingKey = parser.getAttributeValue(null, "key");
++                        if (settingKey != null && settingKey.length() > MAX_FIELD_CHARS) {
++                            throw new XmlPullParserException(
++                                    "Ein XML-Attribut der Materialdatei ist ungewöhnlich lang.",
++                                    parser, null);
++                        }
+                         if (isWeightSetting(settingKey)) {
+                             spoolWeightMg = parseWeightMgOrZero(safeNextText(parser));
+                         }
+                     }
+                 }
+             }
+-            event = parser.next();
++            event = parser.nextToken();
++        }
++
++        if (!rootSeen) {
++            throw new XmlPullParserException("Die Materialdatei enthält kein XML-Wurzelelement.");
+         }
+ 
+         if (material.isEmpty()) {
+             material = description;
+         }
+         if (guid.isEmpty()) {
+-            throw new IllegalArgumentException("Die Datei enth\u00e4lt keine Material-GUID.");
++            throw new IllegalArgumentException("Die Datei enthält keine Material-GUID.");
+         }
+         if (brand.isEmpty() && material.isEmpty() && color.isEmpty()) {
+             material = "Importiertes Material";
+@@ -70,6 +121,19 @@
+         return new MaterialProfile(brand, material, color, guid, spoolWeightMg);
+     }
+ 
++    private static void hardenFactory(XmlPullParserFactory factory) throws XmlPullParserException {
++        // Android's security guidance recommends rejecting DTD declarations. Some
++        // XmlPull implementations do not expose the Apache feature; in that case
++        // FEATURE_PROCESS_DOCDECL=false plus the explicit DOCDECL check above is
++        // the portable fallback.
++        try {
++            factory.setFeature(FEATURE_DISALLOW_DOCTYPE, true);
++        } catch (XmlPullParserException unsupportedFeature) {
++            factory.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false);
++        }
++        factory.setFeature(XmlPullParser.FEATURE_VALIDATION, false);
++    }
++
+     private static boolean isDirectWeightTag(String key) {
+         return "weight".equals(key)
+                 || "spool_weight".equals(key)
+@@ -123,9 +187,49 @@
+     private static String safeNextText(XmlPullParser parser) throws IOException, XmlPullParserException {
+         try {
+             String text = parser.nextText();
+-            return text == null ? "" : text.trim();
++            String cleaned = text == null ? "" : text.trim();
++            if (cleaned.length() > MAX_FIELD_CHARS) {
++                throw new XmlPullParserException(
++                        "Ein Feld der Materialdatei ist ungewöhnlich lang.", parser, null);
++            }
++            return cleaned;
+         } catch (IllegalStateException exception) {
+             return "";
+         }
+     }
++
++    private static final class LimitedInputStream extends FilterInputStream {
++        private final long limit;
++        private long consumed;
++
++        LimitedInputStream(InputStream inputStream, long limit) {
++            super(inputStream);
++            this.limit = limit;
++        }
++
++        @Override
++        public int read() throws IOException {
++            int value = super.read();
++            if (value >= 0) {
++                increment(1L);
++            }
++            return value;
++        }
++
++        @Override
++        public int read(byte[] buffer, int offset, int length) throws IOException {
++            int count = super.read(buffer, offset, length);
++            if (count > 0) {
++                increment(count);
++            }
++            return count;
++        }
++
++        private void increment(long count) throws IOException {
++            consumed += count;
++            if (consumed > limit) {
++                throw new IOException("Materialdatei ist größer als " + limit + " Byte.");
++            }
++        }
++    }
+ }
+diff -ruN '--exclude=changes.diff' a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+--- a/app/src/main/res/values/strings.xml	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/main/res/values/strings.xml	2026-08-25 09:30:38.165363643 +0000
+@@ -26,7 +26,7 @@
      <string name="page_materials">Materialbibliothek</string>
      <string name="page_info">Info</string>
--    <string name="page_license">Lizenz</string>
--    <string name="version_footer">Version 1.1.17</string>
-+    <string name="page_license">Lizenz &amp; Open Source</string>
-+    <string name="version_footer">Version 1.1.18</string>
-+    <string name="license_app_version">Spool Maker Android %1$s</string>
-+    <string name="license_badge">GPL-3.0-or-later</string>
-+    <string name="license_intro">Freie Software mit offenem Quellcode. Die Hinweise auf dieser Seite fassen Herkunft, Änderungsstand und Lizenz zusammen.</string>
-+    <string name="license_origin_title">Herkunft &amp; Urheberrecht</string>
-+    <string name="license_origin_body">Basierend auf Spool-Maker von Dale A. Osborne.\nCopyright &#169; 2021 Dale Osborne.\nhttps://github.com/DA-Osborne/Spool-Maker</string>
-+    <string name="license_modification_title">Android-Port &amp; Änderungen</string>
-+    <string name="license_modification_body">Dies ist eine veränderte Android-Fassung des Upstream-Projekts. Änderungsstand dieser Fassung: 25.08.2026. Die Android-Portierung und späteren Änderungen werden unter GPL-3.0-or-later veröffentlicht; Rechte an den jeweiligen Beiträgen verbleiben bei den jeweiligen Beitragenden.</string>
-+    <string name="license_terms_title">Lizenzhinweis</string>
-+    <string name="license_terms_body">Weitergabe und Änderungen sind unter den Bedingungen der GNU General Public License Version 3 oder jeder späteren Version zulässig. Soweit gesetzlich zulässig, wird die Software ohne Gewährleistung bereitgestellt. Der vollständige Lizenztext ist über die Schaltfläche unten verfügbar.</string>
-+    <string name="license_source_title">Quellcode</string>
-+    <string name="license_source_body">https://github.com/joker-mik/SpoolMakerAndroid</string>
-+    <string name="button_license_full">Vollständigen GPL-3.0-Lizenztext anzeigen</string>
-+    <string name="license_notice_footer">Nicht verbunden mit oder unterstützt von UltiMaker oder dem Upstream-Projekt.</string>
-     <string name="label_uid">UID</string>
-     <string name="label_guid">Material-GUID</string>
-     <string name="label_material">Material</string>
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md	2026-08-25 08:49:33.534479438 +0000
+     <string name="page_license">Lizenz &amp; Open Source</string>
+-    <string name="version_footer">Version 1.1.18</string>
++    <string name="version_footer">Version 1.2.0</string>
+     <string name="license_app_version">Spool Maker Android %1$s</string>
+     <string name="license_badge">GPL-3.0-or-later</string>
+     <string name="license_intro">Freie Software mit offenem Quellcode. Die Hinweise auf dieser Seite fassen Herkunft, Änderungsstand und Lizenz zusammen.</string>
+diff -ruN '--exclude=changes.diff' a/app/src/test/java/de/spoolmaker/android/nfc/NtagIoTest.java b/app/src/test/java/de/spoolmaker/android/nfc/NtagIoTest.java
+--- a/app/src/test/java/de/spoolmaker/android/nfc/NtagIoTest.java	1970-01-01 00:00:00.000000000 +0000
++++ b/app/src/test/java/de/spoolmaker/android/nfc/NtagIoTest.java	2026-08-25 09:31:08.313490264 +0000
+@@ -0,0 +1,94 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later */
++package de.spoolmaker.android.nfc;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertNull;
++import static org.junit.Assert.assertThrows;
++import static org.junit.Assert.assertTrue;
++
++import org.junit.Test;
++
++import java.io.IOException;
++
++public final class NtagIoTest {
++    private static final byte[] VERSION_215 = new byte[]{
++            0x00, 0x04, 0x04, 0x02, 0x01, 0x00, 0x11, 0x03
++    };
++    private static final byte[] VERSION_216 = new byte[]{
++            0x00, 0x04, 0x04, 0x02, 0x01, 0x00, 0x13, 0x03
++    };
++    private static final byte[] VERSION_213 = new byte[]{
++            0x00, 0x04, 0x04, 0x02, 0x01, 0x00, 0x0F, 0x03
++    };
++
++    @Test
++    public void getVersionAcceptsNtag215AndNtag216() throws Exception {
++        NtagIo.TagInfo ntag215 = NtagIo.parseVersionResponse(VERSION_215);
++        NtagIo.TagInfo ntag216 = NtagIo.parseVersionResponse(VERSION_216);
++
++        assertEquals(NtagIo.TagModel.NTAG215, ntag215.getModel());
++        assertEquals(NtagIo.NTAG215_USER_BYTES, ntag215.getUserBytes());
++        assertEquals(NtagIo.TagModel.NTAG216, ntag216.getModel());
++        assertEquals(NtagIo.NTAG216_USER_BYTES, ntag216.getUserBytes());
++    }
++
++    @Test
++    public void getVersionRejectsOtherNtag21xSizes() {
++        IOException exception = assertThrows(IOException.class,
++                () -> NtagIo.parseVersionResponse(VERSION_213));
++        assertTrue(exception.getMessage().contains("NTAG215 und NTAG216"));
++    }
++
++    @Test
++    public void unlockedTargetRangePassesPreflightModel() throws Exception {
++        NtagIo.TagInfo info = NtagIo.parseVersionResponse(VERSION_215);
++        byte[] page2 = new byte[16];
++        byte[] dynamic = new byte[16];
++        byte[] config = new byte[16];
++        config[3] = (byte) 0xFF;
++
++        assertNull(NtagIo.findWriteProtectionReason(info, 4, 60,
++                page2, dynamic, config));
++    }
++
++    @Test
++    public void staticLockForPageFourIsDetected() throws Exception {
++        NtagIo.TagInfo info = NtagIo.parseVersionResponse(VERSION_215);
++        byte[] page2 = new byte[16];
++        page2[2] = 0x10;
++        byte[] dynamic = new byte[16];
++        byte[] config = new byte[16];
++        config[3] = (byte) 0xFF;
++
++        String reason = NtagIo.findWriteProtectionReason(info, 4, 60,
++                page2, dynamic, config);
++        assertTrue(reason.contains("Seite 4"));
++    }
++
++    @Test
++    public void dynamicLockForPages48To63IsDetected() throws Exception {
++        NtagIo.TagInfo info = NtagIo.parseVersionResponse(VERSION_216);
++        byte[] page2 = new byte[16];
++        byte[] dynamic = new byte[16];
++        dynamic[0] = 0x04;
++        byte[] config = new byte[16];
++        config[3] = (byte) 0xFF;
++
++        String reason = NtagIo.findWriteProtectionReason(info, 4, 60,
++                page2, dynamic, config);
++        assertTrue(reason.contains("Seite 48 bis 63"));
++    }
++
++    @Test
++    public void passwordProtectionStartingInsideTargetIsDetected() throws Exception {
++        NtagIo.TagInfo info = NtagIo.parseVersionResponse(VERSION_215);
++        byte[] page2 = new byte[16];
++        byte[] dynamic = new byte[16];
++        byte[] config = new byte[16];
++        config[3] = 60;
++
++        String reason = NtagIo.findWriteProtectionReason(info, 4, 60,
++                page2, dynamic, config);
++        assertTrue(reason.contains("ab Seite 60"));
++    }
++}
+diff -ruN '--exclude=changes.diff' a/app/src/test/java/de/spoolmaker/android/nfc/UltimakerTagCodecTest.java b/app/src/test/java/de/spoolmaker/android/nfc/UltimakerTagCodecTest.java
+--- a/app/src/test/java/de/spoolmaker/android/nfc/UltimakerTagCodecTest.java	2026-08-25 08:59:07.000000000 +0000
++++ b/app/src/test/java/de/spoolmaker/android/nfc/UltimakerTagCodecTest.java	2026-08-25 09:31:08.147074535 +0000
+@@ -65,6 +65,8 @@
+         assertEquals(1, decoded.getSignatureRecordCount());
+         assertEquals(888, decoded.getReadMemoryLength());
+         assertEquals(226, decoded.getNdefLength());
++        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
++        assertTrue(UltimakerTagCodec.isIntegrityValid(UID, decoded));
+ 
+         for (UltimakerTagCodec.DecodedStatusRecord status : decoded.getStatusRecords()) {
+             assertTrue(status.isCrcValid());
+@@ -74,6 +76,35 @@
+     }
+ 
+     @Test
++    public void writerRoundTripsFromNtag215SizedMemory() {
++        byte[] encoded = UltimakerTagCodec.encodeSpool(
++                GUID, UID, 750_000L, 650_000L,
++                UltimakerTagCodec.DateMeaning.OPENED, DATE_SECONDS);
++
++        byte[] ntag215Memory = Arrays.copyOf(encoded, NtagIo.NTAG215_USER_BYTES);
++        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(ntag215Memory);
++
++        assertEquals(NtagIo.NTAG215_USER_BYTES, decoded.getReadMemoryLength());
++        assertEquals(650_000L, decoded.getRemainingAmount());
++        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
++        assertTrue(UltimakerTagCodec.isIntegrityValid(UID, decoded));
++    }
++
++    @Test
++    public void changedSignatureMarkerBreaksOverallIntegrity() {
++        byte[] encoded = UltimakerTagCodec.encodeSpool(
++                GUID, UID, 750_000L, 750_000L,
++                UltimakerTagCodec.DateMeaning.OPENED, DATE_SECONDS);
++        encoded[141] ^= 0x01;
++
++        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(encoded);
++
++        assertFalse(decoded.hasExpectedSigMarker());
++        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
++        assertFalse(UltimakerTagCodec.isIntegrityValid(UID, decoded));
++    }
++
++    @Test
+     public void noneDateStillWritesNewSpoolMakerFormat() {
+         byte[] encoded = UltimakerTagCodec.encodeSpool(
+                 GUID, UID, 1_000_000L, 425_000L,
+diff -ruN '--exclude=changes.diff' a/docs/FORMAT.md b/docs/FORMAT.md
+--- a/docs/FORMAT.md	2026-08-25 08:59:07.000000000 +0000
++++ b/docs/FORMAT.md	2026-08-25 09:32:01.993043446 +0000
+@@ -1,8 +1,9 @@
+-# Ultimaker spool tag format used by this port
++# UltiMaker spool tag format used by this port
+ 
+-The app intentionally reproduces the raw NDEF byte stream written by the
+-original Spool Maker implementation. It writes the stream directly to NTAG
+-user page 4 rather than adding an NFC Forum Type 2 TLV wrapper.
++The app reproduces the raw NDEF byte stream used by the compatible spool-tag
++format. It writes the stream directly to NTAG user page 4 rather than adding an
++NFC Forum Type 2 TLV wrapper. The current writer accepts NTAG215 and NTAG216;
++the 228-byte write image fits in both user-memory areas.
+ 
+ ## Message layout
+ 
+@@ -13,8 +14,9 @@
+ | Status | External | `ultimaker.nl:stat` | `2` | 20 bytes |
+ | Status copy | External | `ultimaker.nl:stat` | `2` | 20 bytes |
+ 
+-All records use the NDEF short-record form. The resulting 226-byte NDEF
+-message is padded with two zero bytes to a four-byte NTAG page boundary.
++All records use the NDEF short-record form. The resulting 226-byte NDEF message
++is padded with two zero bytes to a four-byte NTAG page boundary, resulting in a
++228-byte write image.
+ 
+ ## Material payload (108 bytes)
+ 
+@@ -23,11 +25,16 @@
+ | 0 | 1 | Format version (`0`) |
+ | 1 | 1 | Compatibility (`0`) |
+ | 2 | 14 | Tag UID as uppercase hexadecimal UTF-8, zero padded |
+-| 16 | 8 | Manufacturing timestamp (Unix seconds), unsigned big-endian (default `0`) |
++| 16 | 8 | Big-endian IEEE-754 `double`; Unix seconds for SpoolMaker dates, `0.0` when no date is selected |
+ | 24 | 16 | Material UUID bytes |
+-| 40 | 2 | Station ID, unsigned big-endian (`0xAFFE`) |
+-| 42 | 64 | Batch code, UTF-8, zero padded (`123456789AB`) |
+-| 106 | 2 | Reserved zero bytes |
++| 40 | 2 | Station ID, unsigned big-endian (`0xAFFE` for newly written tags) |
++| 42 | 64 | Batch code, UTF-8, zero padded (`123456789AB` for newly written tags) |
++| 106 | 1 | SpoolMaker metadata marker (`0x53`, ASCII `S`) on newly written tags |
++| 107 | 1 | Date-meaning code: `0` none, `1` manufactured, `2` purchased, `3` opened, `4` created |
++
++Original/factory tags may use different values in bytes 106..107. The decoder
++therefore exposes the two trailing bytes as data and only interprets the date
++meaning when byte 106 contains the SpoolMaker marker.
+ 
+ ## Status payload (20 bytes)
+ 
+@@ -38,8 +45,17 @@
+ | 2 | 1 | Unit (`2` = milligrams) |
+ | 3 | 4 | Total amount, unsigned big-endian |
+ | 7 | 4 | Remaining amount, unsigned big-endian |
+-| 11 | 8 | Total usage duration in seconds, unsigned big-endian (default `0`) |
++| 11 | 8 | Total usage duration in seconds, unsigned big-endian (new tags start at `0`) |
+ | 19 | 1 | CRC-8 over bytes 0 through 18 |
+ 
+-CRC-8 uses polynomial `0x07`, initial value `0x00`, no reflection and no
+-final XOR. The check vector ASCII `123` produces `0xC0`.
++CRC-8 uses polynomial `0x07`, initial value `0x00`, no reflection and no final
++XOR. The check vector ASCII `123` produces `0xC0`.
++
++## Supported physical tags
++
++Before writing, the Android app identifies the tag with `GET_VERSION`. Only
++NTAG215 and NTAG216 are accepted. The app reads lock/configuration information
++and rejects a target range that is statically locked, dynamically locked or
++password-protected. After writing, only the 228-byte target range is required
++for the immediate byte-for-byte verification; full reads use the detected
++user-memory size.
+diff -ruN '--exclude=changes.diff' a/docs/GITHUB_ACTIONS.md b/docs/GITHUB_ACTIONS.md
+--- a/docs/GITHUB_ACTIONS.md	2026-08-25 08:59:07.000000000 +0000
++++ b/docs/GITHUB_ACTIONS.md	2026-08-25 09:36:31.371746971 +0000
+@@ -1,18 +1,21 @@
+ # GitHub Actions
+ 
+-The CI workflow deliberately sets up all build prerequisites instead of assuming
+-that they are present on the hosted runner:
++The workflows set up the build prerequisites instead of relying on tools that
++happen to be present on the hosted runner:
+ 
+ - JDK 17
+ - Android command-line tools
+ - Android Platform 36
+ - Android Build Tools 36.0.0
+-- Gradle 9.5.0
++- the repository's checksum-verified `./gradlew` bootstrap (Gradle 9.5.0)
+ 
+-CI runs on pushes to `main`, pull requests, and manual workflow dispatch.
++CI runs on pushes to `main`, pull requests, and manual workflow dispatch. It
++runs the standalone codec self-test, Android unit tests, Android Lint and the
++debug APK build.
+ 
+-The release workflow runs on tags matching `v*`. It needs these repository
+-secrets:
++The release workflow runs on tags matching `v*`. Before signing it checks that
++the tag exactly matches the `versionName` in `app/build.gradle`. It needs these
++repository secrets:
+ 
+ - `ANDROID_KEYSTORE_BASE64`
+ - `ANDROID_KEYSTORE_PASSWORD`
+diff -ruN '--exclude=changes.diff' a/docs/GITHUB_RELEASE.md b/docs/GITHUB_RELEASE.md
+--- a/docs/GITHUB_RELEASE.md	2026-08-25 08:59:07.000000000 +0000
++++ b/docs/GITHUB_RELEASE.md	2026-08-25 09:32:01.999440863 +0000
 @@ -49,15 +49,15 @@
  
  Die Version in `app/build.gradle` muss zum Tag passen. Fuer diesen Stand:
  
--- `versionName '1.1.17'`
--- `versionCode 27`
--- Tag `v1.1.17`
-+- `versionName '1.1.18'`
-+- `versionCode 28`
-+- Tag `v1.1.18`
+-- `versionName '1.1.18'`
+-- `versionCode 28`
+-- Tag `v1.1.18`
++- `versionName '1.2.0'`
++- `versionCode 29`
++- Tag `v1.2.0`
  
  Danach:
  
  ```bash
--git tag v1.1.17
--git push origin v1.1.17
-+git tag v1.1.18
-+git push origin v1.1.18
+-git tag v1.1.18
+-git push origin v1.1.18
++git tag v1.2.0
++git push origin v1.2.0
  ```
  
  Der Workflow baut die signierte APK und legt automatisch einen GitHub Release
-diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template
---- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template	2026-08-25 08:05:32.000000000 +0000
-+++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template	2026-08-25 08:49:33.534384475 +0000
-@@ -8,14 +8,14 @@
- Repo: https://github.com/GITHUB_USER/SpoolMakerAndroid.git
+diff -ruN '--exclude=changes.diff' a/fastlane/metadata/android/de-DE/changelogs/29.txt b/fastlane/metadata/android/de-DE/changelogs/29.txt
+--- a/fastlane/metadata/android/de-DE/changelogs/29.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/fastlane/metadata/android/de-DE/changelogs/29.txt	2026-08-25 09:32:02.002913772 +0000
+@@ -0,0 +1 @@
++Initiale Version 1.2.0: NTAG215/216-Erkennung, Schreibschutz-Pruefung, sicherere NFC-Zustandsfuehrung, gehaerteter Materialimport und strengere Integritaetspruefung.
+diff -ruN '--exclude=changes.diff' a/fastlane/metadata/android/de-DE/full_description.txt b/fastlane/metadata/android/de-DE/full_description.txt
+--- a/fastlane/metadata/android/de-DE/full_description.txt	2026-08-25 08:59:07.000000000 +0000
++++ b/fastlane/metadata/android/de-DE/full_description.txt	2026-08-25 09:32:02.000354312 +0000
+@@ -1,5 +1,5 @@
+ Spool Maker ist eine freie Android-App zum Lesen und Schreiben kompatibler
+-NFC-Spulentags auf NTAG216-Basis.
++NFC-Spulentags auf NTAG215- und NTAG216-Basis.
+ 
+ Die App kann Materialinformationen und Gewichtsangaben auslesen, neue Tags
+ schreiben und Cura/UltiMaker-Materialdateien importieren. Eine lokale
+diff -ruN '--exclude=changes.diff' a/fastlane/metadata/android/en-US/changelogs/29.txt b/fastlane/metadata/android/en-US/changelogs/29.txt
+--- a/fastlane/metadata/android/en-US/changelogs/29.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/fastlane/metadata/android/en-US/changelogs/29.txt	2026-08-25 09:32:02.003572182 +0000
+@@ -0,0 +1 @@
++Initial 1.2.0 release: NTAG215/216 detection, write-protection preflight, safer NFC state handling, hardened material import, and stricter integrity validation.
+diff -ruN '--exclude=changes.diff' a/fastlane/metadata/android/en-US/full_description.txt b/fastlane/metadata/android/en-US/full_description.txt
+--- a/fastlane/metadata/android/en-US/full_description.txt	2026-08-25 08:59:07.000000000 +0000
++++ b/fastlane/metadata/android/en-US/full_description.txt	2026-08-25 09:32:02.001554470 +0000
+@@ -1,4 +1,4 @@
+-Spool Maker is a free Android app for reading and writing compatible NTAG216
++Spool Maker is a free Android app for reading and writing compatible NTAG215 and NTAG216
+ NFC spool tags.
+ 
+ It can read material and weight information, write new tags, and import
+diff -ruN '--exclude=changes.diff' a/fdroid/de.spoolmaker.android.yml.template b/fdroid/de.spoolmaker.android.yml.template
+--- a/fdroid/de.spoolmaker.android.yml.template	2026-08-25 08:59:07.000000000 +0000
++++ b/fdroid/de.spoolmaker.android.yml.template	2026-08-25 09:34:27.164542086 +0000
+@@ -1,21 +1,21 @@
+ Categories:
+   - Development
+ License: GPL-3.0-or-later
+-SourceCode: https://github.com/GITHUB_USER/SpoolMakerAndroid
+-IssueTracker: https://github.com/GITHUB_USER/SpoolMakerAndroid/issues
++SourceCode: https://github.com/joker-mik/SpoolMakerAndroid
++IssueTracker: https://github.com/joker-mik/SpoolMakerAndroid/issues
+ 
+ RepoType: git
+-Repo: https://github.com/GITHUB_USER/SpoolMakerAndroid.git
++Repo: https://github.com/joker-mik/SpoolMakerAndroid.git
  
  Builds:
--  - versionName: 1.1.17
--    versionCode: 27
--    commit: FULL_COMMIT_SHA_OF_V1.1.17
-+  - versionName: 1.1.18
-+    versionCode: 28
-+    commit: FULL_COMMIT_SHA_OF_V1.1.18
+-  - versionName: 1.1.18
+-    versionCode: 28
+-    commit: FULL_COMMIT_SHA_OF_V1.1.18
++  - versionName: 1.2.0
++    versionCode: 29
++    commit: FULL_COMMIT_SHA_OF_V1.2.0
      subdir: app
      gradle:
        - yes
  
  AutoUpdateMode: Version
  UpdateCheckMode: Tags
--CurrentVersion: 1.1.17
--CurrentVersionCode: 27
-+CurrentVersion: 1.1.18
-+CurrentVersionCode: 28
+-CurrentVersion: 1.1.18
+-CurrentVersionCode: 28
++CurrentVersion: 1.2.0
++CurrentVersionCode: 29
+diff -ruN '--exclude=changes.diff' a/tools/CodecSelfTest.java b/tools/CodecSelfTest.java
+--- a/tools/CodecSelfTest.java	2026-08-25 08:59:07.000000000 +0000
++++ b/tools/CodecSelfTest.java	2026-08-25 09:31:08.314492330 +0000
+@@ -19,54 +19,61 @@
+         require(UltimakerTagCodec.crc8("123".getBytes(StandardCharsets.US_ASCII)) == 0xC0,
+                 "CRC-8 reference vector failed");
+ 
+-        byte[] encoded = UltimakerTagCodec.encodeSpool(guid, uid, 750_000L, timestamp, 12_345L);
++        byte[] encoded = UltimakerTagCodec.encodeSpool(
++                guid, uid, 750_000L, 750_000L,
++                UltimakerTagCodec.DateMeaning.OPENED, timestamp);
+         require(encoded.length == 228, "Expected 228-byte padded message");
+         require((encoded[0] & 0xFF) == 0x9C, "Material record header mismatch");
+         require((encoded[134] & 0xFF) == 0x11, "Signature record header mismatch");
+         require((encoded[142] & 0xFF) == 0x1C, "First status record header mismatch");
+         require((encoded[184] & 0xFF) == 0x5C, "Second status record header mismatch");
+ 
+-        byte[] fullUserMemory = Arrays.copyOf(encoded, 888);
+-        fullUserMemory[887] = (byte) 0xA5;
+-        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(fullUserMemory);
+-        require(guid.equals(decoded.getMaterialGuid()), "GUID round trip failed");
+-        require(uid.equals(decoded.getSerial()), "UID serial round trip failed");
+-        require(decoded.getTotalAmount() == 750_000L, "Total weight mismatch");
+-        require(decoded.getRemainingAmount() == 750_000L, "Remaining weight mismatch");
+-        require(decoded.isStatusCrcValid(), "CRC should be valid");
+-
+-        UltimakerTagCodec.DecodedSpool partial = UltimakerTagCodec.decode(
+-                UltimakerTagCodec.encodeSpool(guid, uid, 1_000_000L, 425_000L));
+-        require(partial.getTotalAmount() == 1_000_000L, "Custom total weight mismatch");
+-        require(partial.getRemainingAmount() == 425_000L, "Custom remaining weight mismatch");
+-        require(decoded.isDuplicateStatusMatches(), "Status copies should match");
+-        require(decoded.isSignaturePresent(), "Signature record missing");
+-        require(decoded.isSignatureValid(), "Signature value should be valid");
+-        require(decoded.getSignatureValue() == 0x2000, "Signature value mismatch");
+-        require(decoded.getTotalUsageDurationSeconds() == 12_345L,
+-                "Usage duration round trip failed");
+-        require(decoded.getStatusRecordCount() == 2, "Expected two status records");
+-        require(decoded.getNdefRecords().size() == 4, "Expected four NDEF records");
+-        require(decoded.getMaterialRecordCount() == 1, "Expected one material record");
+-        require(decoded.getSignatureRecordCount() == 1, "Expected one signature record");
+-        require(decoded.getReadMemoryLength() == 888, "Full user memory length was not retained");
+-        require(decoded.getNdefLength() == 226, "Consumed NDEF length mismatch");
+-        require("0000".equals(decoded.getMaterialReservedHex()), "Reserved bytes mismatch");
+-        for (UltimakerTagCodec.DecodedStatusRecord status : decoded.getStatusRecords()) {
+-            require(status.isCrcValid(), "Individual status CRC should be valid");
+-            require(status.getStoredCrc() == status.getCalculatedCrc(),
+-                    "Stored and calculated CRC differ");
+-            require(status.getPayloadHex().length() == 40, "Status payload hex length mismatch");
+-        }
+-
+-        UltimakerTagCodec.DecodedSpool defaults = UltimakerTagCodec.decode(
+-                UltimakerTagCodec.encodeSpool(guid, uid, 1_000_000L));
+-        require(defaults.getMaterialVersion() == 0, "Material version default mismatch");
+-        require(defaults.getStatusVersion() == 0, "Status version default mismatch");
+-        require(defaults.getManufacturingTimestamp() == 0L,
+-                "Manufacturing timestamp default mismatch");
+-        require(defaults.getTotalUsageDurationSeconds() == 0L,
+-                "Usage duration default mismatch");
++        byte[] ntag216Memory = Arrays.copyOf(encoded, 888);
++        ntag216Memory[887] = (byte) 0xA5;
++        UltimakerTagCodec.DecodedSpool decoded216 = UltimakerTagCodec.decode(ntag216Memory);
++        require(guid.equals(decoded216.getMaterialGuid()), "GUID round trip failed");
++        require(uid.equals(decoded216.getSerial()), "UID serial round trip failed");
++        require(decoded216.getTotalAmount() == 750_000L, "Total weight mismatch");
++        require(decoded216.getRemainingAmount() == 750_000L, "Remaining weight mismatch");
++        require(decoded216.isStatusCrcValid(), "CRC should be valid");
++        require(decoded216.isDuplicateStatusMatches(), "Status copies should match");
++        require(decoded216.isSignaturePresent(), "Signature record missing");
++        require(decoded216.hasExpectedSigMarker(), "Signature marker should be 0x2000");
++        require(decoded216.getSignatureValue() == 0x2000, "Signature value mismatch");
++        require(decoded216.getStatusRecordCount() == 2, "Expected two status records");
++        require(decoded216.getNdefRecords().size() == 4, "Expected four NDEF records");
++        require(decoded216.getMaterialRecordCount() == 1, "Expected one material record");
++        require(decoded216.getSignatureRecordCount() == 1, "Expected one signature record");
++        require(decoded216.getReadMemoryLength() == 888,
++                "NTAG216 memory length was not retained");
++        require(decoded216.getNdefLength() == 226, "Consumed NDEF length mismatch");
++        require(decoded216.isSpoolMakerTag(), "SpoolMaker marker missing");
++        require(decoded216.getDateMeaning() == UltimakerTagCodec.DateMeaning.OPENED,
++                "Date meaning mismatch");
++        require(Math.round(decoded216.getTimeFieldDoubleSeconds()) == timestamp,
++                "Date field mismatch");
++        require(UltimakerTagCodec.hasExpectedNdefLayout(decoded216),
++                "Expected NDEF layout missing");
++        require(UltimakerTagCodec.isIntegrityValid(uid, decoded216),
++                "Overall integrity should be valid");
++
++        byte[] ntag215Memory = Arrays.copyOf(encoded, 504);
++        UltimakerTagCodec.DecodedSpool decoded215 = UltimakerTagCodec.decode(ntag215Memory);
++        require(decoded215.getReadMemoryLength() == 504,
++                "NTAG215 memory length was not retained");
++        require(UltimakerTagCodec.isIntegrityValid(uid, decoded215),
++                "NTAG215-sized memory should decode with valid integrity");
++
++        byte[] noDate = UltimakerTagCodec.encodeSpool(
++                guid, uid, 1_000_000L, 425_000L,
++                UltimakerTagCodec.DateMeaning.NONE, 0L);
++        UltimakerTagCodec.DecodedSpool noDateDecoded = UltimakerTagCodec.decode(noDate);
++        require(noDateDecoded.getTotalAmount() == 1_000_000L, "Custom total weight mismatch");
++        require(noDateDecoded.getRemainingAmount() == 425_000L, "Custom remaining weight mismatch");
++        require(noDateDecoded.getTotalUsageDurationSeconds() == 0L,
++                "New tags must start with zero usage duration");
++        require("5300".equals(noDateDecoded.getMaterialTrailingHex()),
++                "SpoolMaker marker/date code mismatch");
+ 
+         byte[] tlv = new byte[encoded.length + 3];
+         tlv[0] = 0x03;
+@@ -77,17 +84,27 @@
+         require(tlvDecoded.isTlvWrapped(), "TLV wrapper not detected");
+         require(tlvDecoded.getNdefOffset() == 2, "TLV NDEF offset mismatch");
+ 
+-        byte[] damaged = Arrays.copyOf(encoded, encoded.length);
+-        damaged[183] ^= 0x01;
+-        UltimakerTagCodec.DecodedSpool damagedDecoded = UltimakerTagCodec.decode(damaged);
+-        require(!damagedDecoded.isStatusCrcValid(), "Damaged CRC was not detected");
+-        require(!damagedDecoded.isDuplicateStatusMatches(), "Different status copies were not detected");
++        byte[] damagedStatus = Arrays.copyOf(encoded, encoded.length);
++        damagedStatus[183] ^= 0x01;
++        UltimakerTagCodec.DecodedSpool damagedStatusDecoded =
++                UltimakerTagCodec.decode(damagedStatus);
++        require(!damagedStatusDecoded.isStatusCrcValid(), "Damaged CRC was not detected");
++        require(!damagedStatusDecoded.isDuplicateStatusMatches(),
++                "Different status copies were not detected");
++
++        byte[] damagedSignature = Arrays.copyOf(encoded, encoded.length);
++        damagedSignature[141] ^= 0x01;
++        UltimakerTagCodec.DecodedSpool damagedSignatureDecoded =
++                UltimakerTagCodec.decode(damagedSignature);
++        require(!damagedSignatureDecoded.hasExpectedSigMarker(),
++                "Damaged signature marker was not detected");
++        require(!UltimakerTagCodec.isIntegrityValid(uid, damagedSignatureDecoded),
++                "Damaged signature marker must fail overall integrity");
+ 
+         System.out.println("CodecSelfTest OK");
+         System.out.println("Encoded bytes: " + encoded.length);
+-        System.out.println("Decoded user bytes: " + decoded.getReadMemoryLength());
+-        System.out.println("NDEF records: " + decoded.getNdefRecords().size());
+-        System.out.println("GUID: " + decoded.getMaterialGuid());
+-        System.out.println("Weight mg: " + decoded.getRemainingAmount());
++        System.out.println("NTAG215 decoded user bytes: " + decoded215.getReadMemoryLength());
++        System.out.println("NTAG216 decoded user bytes: " + decoded216.getReadMemoryLength());
++        System.out.println("NDEF records: " + decoded216.getNdefRecords().size());
+     }
+ }

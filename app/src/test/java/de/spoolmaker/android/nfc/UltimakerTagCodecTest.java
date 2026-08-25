@@ -65,12 +65,43 @@ public final class UltimakerTagCodecTest {
         assertEquals(1, decoded.getSignatureRecordCount());
         assertEquals(888, decoded.getReadMemoryLength());
         assertEquals(226, decoded.getNdefLength());
+        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
+        assertTrue(UltimakerTagCodec.isIntegrityValid(UID, decoded));
 
         for (UltimakerTagCodec.DecodedStatusRecord status : decoded.getStatusRecords()) {
             assertTrue(status.isCrcValid());
             assertEquals(status.getStoredCrc(), status.getCalculatedCrc());
             assertEquals(40, status.getPayloadHex().length());
         }
+    }
+
+    @Test
+    public void writerRoundTripsFromNtag215SizedMemory() {
+        byte[] encoded = UltimakerTagCodec.encodeSpool(
+                GUID, UID, 750_000L, 650_000L,
+                UltimakerTagCodec.DateMeaning.OPENED, DATE_SECONDS);
+
+        byte[] ntag215Memory = Arrays.copyOf(encoded, NtagIo.NTAG215_USER_BYTES);
+        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(ntag215Memory);
+
+        assertEquals(NtagIo.NTAG215_USER_BYTES, decoded.getReadMemoryLength());
+        assertEquals(650_000L, decoded.getRemainingAmount());
+        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
+        assertTrue(UltimakerTagCodec.isIntegrityValid(UID, decoded));
+    }
+
+    @Test
+    public void changedSignatureMarkerBreaksOverallIntegrity() {
+        byte[] encoded = UltimakerTagCodec.encodeSpool(
+                GUID, UID, 750_000L, 750_000L,
+                UltimakerTagCodec.DateMeaning.OPENED, DATE_SECONDS);
+        encoded[141] ^= 0x01;
+
+        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(encoded);
+
+        assertFalse(decoded.hasExpectedSigMarker());
+        assertTrue(UltimakerTagCodec.hasExpectedNdefLayout(decoded));
+        assertFalse(UltimakerTagCodec.isIntegrityValid(UID, decoded));
     }
 
     @Test

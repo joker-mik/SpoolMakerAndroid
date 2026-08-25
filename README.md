@@ -1,8 +1,9 @@
-# Spool Maker Android 1.1.18
+# Spool Maker Android 1.2.0
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
-Projekt implementierte UltiMaker-kompatible NFC-Spulenformat auf NTAG216-Tags.
+Projekt implementierte UltiMaker-kompatible NFC-Spulenformat auf NTAG215- und
+NTAG216-Tags.
 
 Upstream / technische Grundlage:
 https://github.com/DA-Osborne/Spool-Maker
@@ -10,41 +11,44 @@ https://github.com/DA-Osborne/Spool-Maker
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.1.18
+## Stand 1.2.0
 
-Der Quellstand fasst die bisher separat gepatchten Funktionen wieder in einem
-normal kompilierbaren Android-Projekt zusammen. Es gibt keine handgebauten
-zusatzlichen DEX-Dateien mehr.
+Version 1.2.0 ist die initiale, gehaertete 1.2-Fassung dieses Android-Ports.
+Die in 1.1.18 aktualisierten Lizenz-, Herkunfts- und Aenderungshinweise wurden
+inhaltlich beibehalten.
 
 Enthalten sind unter anderem:
 
 - NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
-- Vollstaendiges Lesen des 888-Byte-Benutzerspeichers eines NTAG216.
-- Dekodierung von Material-, Signatur- und beiden Statusrecords.
-- Gesamtmenge, Restmenge, Nutzungsdauer, CRC-8, GUID, Batch, Station und weitere
-  Felder werden ausgelesen.
-- Schreibvorgang mit bytegenauer Ruecklesepruefung.
-- Cura/UltiMaker-`.xml.fdm_material`-Import.
+- Explizite Tag-Erkennung per `GET_VERSION`; zugelassen werden NTAG215 und
+  NTAG216.
+- Vollstaendiges Lesen des erkannten Benutzerspeichers: 504 Byte bei NTAG215,
+  888 Byte bei NTAG216.
+- Vor dem Schreiben werden statische Lock-Bits, dynamische Lock-Bits und
+  Passwortschutz fuer den Zielbereich geprueft.
+- Der Schreibdialog bleibt waehrend Schreiben und Verifikation aktiv und warnt
+  davor, den Tag zu entfernen.
+- Nach dem Schreiben werden zuerst exakt die 228 geschriebenen Byte rueckgelesen
+  und bytegenau sowie semantisch verifiziert.
+- Ein abgebrochener Schreibvorgang meldet ausdruecklich, wenn der Tag bereits
+  teilweise veraendert worden sein kann.
+- Dekodierung und Konsistenzpruefung von Material-, Signatur- und beiden
+  Statusrecords inklusive CRC-8, UID/Serienfeld, Signaturmarker und erwartetem
+  Vier-Record-NDEF-Layout.
+- Cura/UltiMaker-`.xml.fdm_material`-Import im Hintergrund mit Begrenzungen fuer
+  Dateigroesse, Dateianzahl und XML-Komplexitaet sowie Ablehnung von DTD/DOCTYPE.
 - Spulengewicht wird beim Import aus `weight` bzw. kompatiblen Gewichtsfeldern
   uebernommen und lokal gespeichert.
-- Im Schreibbereich wird das Material-Spulengewicht vorbelegt; Gesamtmenge und
-  Restmenge bleiben vor dem Schreiben editierbar.
+- Die Materialbibliothek behaelt beim Speichern eine letzte gueltige JSON-
+  Sicherung und ueberschreibt eine beschaedigte Bibliothek nicht stillschweigend.
 - Migration der separat gespeicherten Gewichte aus den App-Versionen 1.1.9 bis
   1.1.15 (`spool_maker_material_weights_v1`).
 - Materialbibliothek als mehrzeilige Liste mit Symbolbuttons fuer Hinzufuegen,
   Bearbeiten und Loeschen.
-- Materialdialog mit beschrifteten Feldern fuer Hersteller, Material, Farbe,
-  GUID und Spulengewicht.
-- NFC-Bereitschaft wird als Dialog mit Abbrechen angezeigt statt als dauerhafte
-  Statusbox.
-- Seitliches Menue mit Materialeinstellungen, Info und Lizenz; die Version steht
-  fest am unteren Rand.
-- Info und Lizenz sind eigene Seiten mit Zurueck-Navigation statt Popups.
-- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und einen Zugriff auf den vollstaendigen GPL-Text.
-- Android-Zurueck-Taste/-Geste schliesst zuerst NFC-Dialog, Menue, Detailbereich
-  oder Unterseite. Erst auf der Hauptseite wird die Activity beendet.
-- Einheitlich blau eingefaerbte App-Leisten; grosser dunkelblauer Lesen-/Schreiben-
-  Button am unteren Rand.
+- NFC-Bereitschaft und Schreibfortschritt werden sichtbar angezeigt.
+- Info und Lizenz sind eigene Seiten mit Zurueck-Navigation.
+- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und den
+  vollstaendigen GPL-Text.
 
 ## Projekt oeffnen
 
@@ -54,9 +58,9 @@ Enthalten sind unter anderem:
 4. Gradle-Synchronisierung ausfuehren.
 5. Ein echtes Android-Geraet mit NFC verwenden.
 
-Das Projekt ist auf Java 17 eingestellt und verwendet den mitgelieferten
-Gradle-Bootstrap. Auf einem Rechner mit Internetzugang laedt dieser die in
-`gradle/wrapper/gradle-wrapper.properties` konfigurierte Gradle-Version.
+Das Projekt ist auf Java 17 eingestellt und verwendet den mitgelieferten,
+checksum-geprueften Gradle-Bootstrap. Auf einem Rechner mit Internetzugang laedt
+dieser die in `gradle/wrapper/gradle-wrapper.properties` konfigurierte Version.
 
 ### Debug-APK
 
@@ -77,23 +81,20 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.1.18
-versionCode:   28
+versionName:   1.2.0
+versionCode:   29
 ```
 
-Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten.
+Der `versionCode` wurde absichtlich nicht auf 1 zurueckgesetzt, damit eine mit
+Code 28 installierte 1.1.18-Fassung auf 1.2.0 aktualisiert werden kann.
 
-Wenn du den bereits separat bereitgestellten PKCS12-Update-Schluessel verwenden
-willst, kopiere `signing.properties.example` nach `signing.properties` und trage
-dort Pfad und Kennwoerter ein. Danach:
+Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten. Fuer einen
+signierten Release-Build `signing.properties.example` nach
+`signing.properties` kopieren, Pfad und Kennwoerter eintragen und danach:
 
 ```bash
 ./gradlew assembleRelease
 ```
-
-Ohne `signing.properties` wird der Release-Build nicht mit diesem Update-
-Schluessel signiert. Eine normal erzeugte Debug-APK kann daher nicht ueber die
-bereits signierte App installiert werden.
 
 ## Codec-Selbsttest ohne Android SDK
 
@@ -106,6 +107,9 @@ javac -d out \
   tools/CodecSelfTest.java
 java -cp out CodecSelfTest
 ```
+
+Der Selbsttest prueft sowohl NTAG215- als auch NTAG216-grosse Speicherabbilder,
+Record-Layout, CRC und Signaturmarker.
 
 ## Ordnerstruktur
 
@@ -127,23 +131,30 @@ app/src/main/res/
 
 ## Hinweise zum Tag-Schreiben
 
-Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG216 verwenden.
-Die App schreibt nur den Benutzerspeicher ab NFC-Seite 4; Hersteller-, Lock-,
-Passwort- und Konfigurationsseiten werden nicht beschrieben.
+Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG215 oder NTAG216
+verwenden. Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-,
+Passwort- und Konfigurationsseiten werden nur gelesen, nicht beschrieben.
+
+Mehrseitige NFC-EEPROM-Schreibvorgaenge sind nicht atomar. Wird ein Tag waehrend
+des Schreibens aus dem Feld entfernt, kann er teilweise veraendert sein. Die App
+haelt den Schreibdialog deshalb bis zum Ende der Ruecklesepruefung offen und
+weist im Fehlerfall auf diesen Zustand hin.
 
 ## Lizenz
 
 GPL-3.0-or-later. Siehe `LICENSE` und `NOTICE.md`.
 
-
 ## GitHub Actions und F-Droid
 
 Dieses Repository enthaelt Workflows unter `.github/workflows/`:
 
-- `ci.yml` baut und testet bei Pushes und Pull Requests eine Debug-APK.
-- `release.yml` baut bei einem Git-Tag wie `v1.1.18` eine signierte Release-APK
-  und legt sie als GitHub Release ab. Die Signierschluessel werden ausschliesslich
-  ueber GitHub Secrets bereitgestellt und gehoeren niemals ins Repository.
+- `ci.yml` fuehrt Standalone-Codec-Test, Android-Unit-Tests, Lint und Debug-Build
+  aus.
+- `release.yml` erwartet fuer diesen Stand den Git-Tag `v1.2.0`, prueft die
+  Versionskonsistenz und baut danach eine signierte Release-APK.
+
+Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
+und gehoeren niemals ins Repository.
 
 F-Droid-Store-Metadaten liegen unter `fastlane/metadata/android/`. Eine Vorlage
 fuers spaetere `fdroiddata`-Merge-Request liegt unter

@@ -111,7 +111,7 @@ public final class UltimakerTagCodec {
         String serial = sanitizeSerial(uidHex);
         if (serial.length() != 14) {
             throw new IllegalArgumentException(
-                    "NTAG216-UID muss als 7 Byte bzw. 14 Hex-Zeichen vorliegen.");
+                    "NTAG215/216-UID muss als 7 Byte bzw. 14 Hex-Zeichen vorliegen.");
         }
 
         double dateSeconds = dateMeaning == DateMeaning.NONE
@@ -313,6 +313,46 @@ public final class UltimakerTagCodec {
         String uid = sanitizeSerial(uidHex);
         String stored = sanitizeSerial(serial);
         return uid.length() == 14 && stored.length() == 14 && uid.equals(stored);
+    }
+
+    /**
+     * Returns true only for the four-record UltiMaker spool layout expected by
+     * this app: material, signature marker, status, status copy.
+     */
+    public static boolean hasExpectedNdefLayout(DecodedSpool decoded) {
+        if (decoded == null || decoded.getNdefRecords().size() != 4) {
+            return false;
+        }
+        List<DecodedNdefRecord> records = decoded.getNdefRecords();
+        return matchesRecord(records.get(0), 0x9C, TNF_EXTERNAL_TYPE,
+                "ultimaker.nl:material", "1", MATERIAL_PAYLOAD_LENGTH)
+                && matchesRecord(records.get(1), 0x11, TNF_WELL_KNOWN,
+                "Sig", "", 2)
+                && matchesRecord(records.get(2), 0x1C, TNF_EXTERNAL_TYPE,
+                "ultimaker.nl:stat", "2", STATUS_PAYLOAD_LENGTH)
+                && matchesRecord(records.get(3), 0x5C, TNF_EXTERNAL_TYPE,
+                "ultimaker.nl:stat", "2", STATUS_PAYLOAD_LENGTH);
+    }
+
+    public static boolean isIntegrityValid(String uidHex, DecodedSpool decoded) {
+        return decoded != null
+                && decoded.isStatusCrcValid()
+                && uidMatchesSerial(uidHex, decoded.getSerial())
+                && decoded.getMaterialRecordCount() == 1
+                && decoded.getSignatureRecordCount() == 1
+                && decoded.getStatusRecordCount() == 2
+                && decoded.hasExpectedSigMarker()
+                && hasExpectedNdefLayout(decoded);
+    }
+
+    private static boolean matchesRecord(DecodedNdefRecord record, int flags, int tnf,
+                                         String type, String id, int payloadLength) {
+        return record != null
+                && record.getFlags() == flags
+                && record.getTnf() == tnf
+                && type.equals(record.getType())
+                && id.equals(record.getIdText())
+                && record.getPayloadLength() == payloadLength;
     }
 
     public static String toHex(byte[] bytes) {
