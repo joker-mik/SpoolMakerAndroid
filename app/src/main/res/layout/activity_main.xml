@@ -778,6 +778,9 @@
             </LinearLayout>
         </LinearLayout>
 
+        <include
+            layout="@layout/page_license" />
+
         <ScrollView
             android:id="@+id/textPageScroll"
             android:layout_width="match_parent"

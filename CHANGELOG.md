@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.18
+
+- Lizenz- und Herkunftshinweise fuer den Android-Port praezisiert.
+- Upstream-Copyright von Dale Osborne und relevanter Aenderungsstand dokumentiert.
+- Lizenzseite optisch ueberarbeitet: kompakte Karten fuer Herkunft, Aenderungen, Lizenz und Quellcode.
+- Vollstaendiger GPL-v3-Text bleibt direkt aus der Lizenzseite erreichbar.
+- Versionsangaben in App-Ressourcen, README, F-Droid-Vorlage und Release-Dokumentation auf 1.1.18 / 28 vereinheitlicht.
+
 ## 1.1.17
 
 - Stabiler oeffentlicher Stand auf Basis des getesteten 1.1.16-fix8-UI.

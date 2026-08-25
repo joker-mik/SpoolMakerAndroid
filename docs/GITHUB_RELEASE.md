@@ -49,15 +49,15 @@ Diese vier Secrets werden von `.github/workflows/release.yml` erwartet:
 
 Die Version in `app/build.gradle` muss zum Tag passen. Fuer diesen Stand:
 
-- `versionName '1.1.17'`
-- `versionCode 27`
-- Tag `v1.1.17`
+- `versionName '1.1.18'`
+- `versionCode 28`
+- Tag `v1.1.18`
 
 Danach:
 
 ```bash
-git tag v1.1.17
-git push origin v1.1.17
+git tag v1.1.18
+git push origin v1.1.18
 ```
 
 Der Workflow baut die signierte APK und legt automatisch einen GitHub Release

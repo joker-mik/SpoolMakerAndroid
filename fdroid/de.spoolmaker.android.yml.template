@@ -8,14 +8,14 @@ RepoType: git
 Repo: https://github.com/GITHUB_USER/SpoolMakerAndroid.git
 
 Builds:
-  - versionName: 1.1.17
-    versionCode: 27
-    commit: FULL_COMMIT_SHA_OF_V1.1.17
+  - versionName: 1.1.18
+    versionCode: 28
+    commit: FULL_COMMIT_SHA_OF_V1.1.18
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.1.17
-CurrentVersionCode: 27
+CurrentVersion: 1.1.18
+CurrentVersionCode: 28

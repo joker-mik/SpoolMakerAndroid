@@ -117,6 +117,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private View drawerOverlay;
     private View secondaryPage;
     private View materialPage;
+    private View licensePage;
     private View textPageScroll;
     private LinearLayout materialList;
     private View tabRead;
@@ -463,6 +464,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         drawerOverlay = findViewById(R.id.drawerOverlay);
         secondaryPage = findViewById(R.id.secondaryPage);
         materialPage = findViewById(R.id.materialPage);
+        licensePage = findViewById(R.id.licensePage);
         textPageScroll = findViewById(R.id.textPageScroll);
         materialList = findViewById(R.id.materialList);
         tabRead = findViewById(R.id.tabRead);
@@ -635,6 +637,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             showLicensePage();
         });
         findViewById(R.id.buttonPageBack).setOnClickListener(view -> closeSecondaryPage());
+        findViewById(R.id.buttonLicenseFull).setOnClickListener(view -> showLicenseDialog());
         configureDrawerAppearance();
         tabRead.setOnClickListener(view -> selectTab(true));
         tabWrite.setOnClickListener(view -> selectTab(false));
@@ -742,6 +745,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void showMaterialPage() {
         textPageTitle.setText(R.string.page_materials);
         materialPage.setVisibility(View.VISIBLE);
+        licensePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.GONE);
         renderMaterialLibrary();
         secondaryPage.setVisibility(View.VISIBLE);
@@ -750,6 +754,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void showInfoPage() {
         textPageTitle.setText(R.string.page_info);
         materialPage.setVisibility(View.GONE);
+        licensePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.VISIBLE);
         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
         textPageBody.setText(
@@ -771,14 +776,20 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void showLicensePage() {
         textPageTitle.setText(R.string.page_license);
         materialPage.setVisibility(View.GONE);
-        textPageScroll.setVisibility(View.VISIBLE);
-        textPageBody.setMovementMethod(null);
-        textPageBody.setTypeface(android.graphics.Typeface.MONOSPACE);
-        try {
-            textPageBody.setText(readRawText(R.raw.gpl_3));
-        } catch (IOException exception) {
-            textPageBody.setText("Lizenztext konnte nicht geladen werden: " + exception.getMessage());
-        }
+        textPageScroll.setVisibility(View.GONE);
+        licensePage.setVisibility(View.VISIBLE);
+
+        TextView version = findViewById(R.id.textLicenseVersion);
+        version.setText(getString(R.string.license_app_version, BuildConfig.VERSION_NAME));
+
+        TextView upstream = findViewById(R.id.textLicenseUpstream);
+        Linkify.addLinks(upstream, Linkify.WEB_URLS);
+        upstream.setMovementMethod(LinkMovementMethod.getInstance());
+
+        TextView source = findViewById(R.id.textLicenseSource);
+        Linkify.addLinks(source, Linkify.WEB_URLS);
+        source.setMovementMethod(LinkMovementMethod.getInstance());
+
         secondaryPage.setVisibility(View.VISIBLE);
     }
 

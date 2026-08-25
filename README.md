@@ -1,4 +1,4 @@
-# Spool Maker Android 1.1.17
+# Spool Maker Android 1.1.18
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
@@ -10,7 +10,7 @@ https://github.com/DA-Osborne/Spool-Maker
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.1.17
+## Stand 1.1.18
 
 Der Quellstand fasst die bisher separat gepatchten Funktionen wieder in einem
 normal kompilierbaren Android-Projekt zusammen. Es gibt keine handgebauten
@@ -40,6 +40,7 @@ Enthalten sind unter anderem:
 - Seitliches Menue mit Materialeinstellungen, Info und Lizenz; die Version steht
   fest am unteren Rand.
 - Info und Lizenz sind eigene Seiten mit Zurueck-Navigation statt Popups.
+- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und einen Zugriff auf den vollstaendigen GPL-Text.
 - Android-Zurueck-Taste/-Geste schliesst zuerst NFC-Dialog, Menue, Detailbereich
   oder Unterseite. Erst auf der Hauptseite wird die Activity beendet.
 - Einheitlich blau eingefaerbte App-Leisten; grosser dunkelblauer Lesen-/Schreiben-
@@ -76,8 +77,8 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.1.17
-versionCode:   27
+versionName:   1.1.18
+versionCode:   28
 ```
 
 Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten.
@@ -140,7 +141,7 @@ GPL-3.0-or-later. Siehe `LICENSE` und `NOTICE.md`.
 Dieses Repository enthaelt Workflows unter `.github/workflows/`:
 
 - `ci.yml` baut und testet bei Pushes und Pull Requests eine Debug-APK.
-- `release.yml` baut bei einem Git-Tag wie `v1.1.17` eine signierte Release-APK
+- `release.yml` baut bei einem Git-Tag wie `v1.1.18` eine signierte Release-APK
   und legt sie als GitHub Release ab. Die Signierschluessel werden ausschliesslich
   ueber GitHub Secrets bereitgestellt und gehoeren niemals ins Repository.
 

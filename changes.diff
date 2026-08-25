@@ -1,0 +1,474 @@
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/CHANGELOG.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/CHANGELOG.md
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/CHANGELOG.md	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/CHANGELOG.md	2026-08-25 08:49:33.534558758 +0000
+@@ -1,5 +1,13 @@
+ # Changelog
+ 
++## 1.1.18
++
++- Lizenz- und Herkunftshinweise fuer den Android-Port praezisiert.
++- Upstream-Copyright von Dale Osborne und relevanter Aenderungsstand dokumentiert.
++- Lizenzseite optisch ueberarbeitet: kompakte Karten fuer Herkunft, Aenderungen, Lizenz und Quellcode.
++- Vollstaendiger GPL-v3-Text bleibt direkt aus der Lizenzseite erreichbar.
++- Versionsangaben in App-Ressourcen, README, F-Droid-Vorlage und Release-Dokumentation auf 1.1.18 / 28 vereinheitlicht.
++
+ ## 1.1.17
+ 
+ - Stabiler oeffentlicher Stand auf Basis des getesteten 1.1.16-fix8-UI.
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/NOTICE.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/NOTICE.md
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/NOTICE.md	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/NOTICE.md	2026-08-25 08:49:02.287494428 +0000
+@@ -1,13 +1,48 @@
+-# Attribution and notices
++# Attribution, modification and license notices
+ 
+-Spool Maker Android is a community Android port based on the behavior and NFC
+-spool format implemented by **Spool-Maker** by DA-Osborne:
++## Project
++
++**Spool Maker Android** is a modified Android port / implementation based on the
++behavior and NFC spool format of **Spool-Maker** by Dale A. Osborne:
+ 
+ https://github.com/DA-Osborne/Spool-Maker
+ 
+-The upstream project is distributed under the GNU General Public License
+-version 3. This derivative project is distributed under GPL-3.0-or-later. See
+-`LICENSE`. Source files carry SPDX identifiers where applicable.
++The upstream project identifies its author as Dale A. Osborne and contains the
++notice:
++
++> Copyright 2021, Dale Osborne
++
++The upstream source states that it is free software under the GNU General Public
++License, version 3 or (at the user's option) any later version.
++
++## Modification notice
++
++This repository contains a modified Android version rather than an unmodified
++copy of the upstream project. Changes include the Android implementation, user
++interface, Android NFC integration, material-profile handling, validation, and
++build/release tooling.
++
++**Relevant modification date for this source release: 2026-08-25.**
++
++Copyright in the Android port and later modifications remains with the
++respective contributors.
++
++This modified project is distributed under **GPL-3.0-or-later**. The complete
++license text is provided in `LICENSE`. Source files carry SPDX identifiers where
++applicable.
++
++## Upstream provenance
++
++The upstream Spool-Maker README states that its GUI/scripts are themselves based
++on some classes written by GitHub user `gandy92`:
++
++https://gist.github.com/gandy92/a7eef12009045f7b3fc01d778c3b79a7
++
++This notice records the provenance stated by the upstream project; it does not
++change or expand the rights granted by any third party.
++
++## Trademarks and affiliation
+ 
+ UltiMaker and Cura are trademarks of their respective owners. This project is
+-not endorsed by or affiliated with UltiMaker or DA-Osborne.
++community software and is not endorsed by or affiliated with UltiMaker,
++Dale A. Osborne, or the upstream Spool-Maker project.
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/README.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/README.md
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/README.md	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/README.md	2026-08-25 08:49:33.534228879 +0000
+@@ -1,4 +1,4 @@
+-# Spool Maker Android 1.1.17
++# Spool Maker Android 1.1.18
+ 
+ Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
+ DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
+@@ -10,7 +10,7 @@
+ Dieses Projekt ist Community-Software und kein offizielles Produkt von
+ UltiMaker oder DA-Osborne.
+ 
+-## Stand 1.1.17
++## Stand 1.1.18
+ 
+ Der Quellstand fasst die bisher separat gepatchten Funktionen wieder in einem
+ normal kompilierbaren Android-Projekt zusammen. Es gibt keine handgebauten
+@@ -40,6 +40,7 @@
+ - Seitliches Menue mit Materialeinstellungen, Info und Lizenz; die Version steht
+   fest am unteren Rand.
+ - Info und Lizenz sind eigene Seiten mit Zurueck-Navigation statt Popups.
++- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und einen Zugriff auf den vollstaendigen GPL-Text.
+ - Android-Zurueck-Taste/-Geste schliesst zuerst NFC-Dialog, Menue, Detailbereich
+   oder Unterseite. Erst auf der Hauptseite wird die Activity beendet.
+ - Einheitlich blau eingefaerbte App-Leisten; grosser dunkelblauer Lesen-/Schreiben-
+@@ -76,8 +77,8 @@
+ 
+ ```text
+ applicationId: de.spoolmaker.android
+-versionName:   1.1.17
+-versionCode:   27
++versionName:   1.1.18
++versionCode:   28
+ ```
+ 
+ Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten.
+@@ -140,7 +141,7 @@
+ Dieses Repository enthaelt Workflows unter `.github/workflows/`:
+ 
+ - `ci.yml` baut und testet bei Pushes und Pull Requests eine Debug-APK.
+-- `release.yml` baut bei einem Git-Tag wie `v1.1.17` eine signierte Release-APK
++- `release.yml` baut bei einem Git-Tag wie `v1.1.18` eine signierte Release-APK
+   und legt sie als GitHub Release ab. Die Signierschluessel werden ausschliesslich
+   ueber GitHub Secrets bereitgestellt und gehoeren niemals ins Repository.
+ 
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/java/de/spoolmaker/android/MainActivity.java	2026-08-25 08:49:20.326435739 +0000
+@@ -117,6 +117,7 @@
+     private View drawerOverlay;
+     private View secondaryPage;
+     private View materialPage;
++    private View licensePage;
+     private View textPageScroll;
+     private LinearLayout materialList;
+     private View tabRead;
+@@ -463,6 +464,7 @@
+         drawerOverlay = findViewById(R.id.drawerOverlay);
+         secondaryPage = findViewById(R.id.secondaryPage);
+         materialPage = findViewById(R.id.materialPage);
++        licensePage = findViewById(R.id.licensePage);
+         textPageScroll = findViewById(R.id.textPageScroll);
+         materialList = findViewById(R.id.materialList);
+         tabRead = findViewById(R.id.tabRead);
+@@ -635,6 +637,7 @@
+             showLicensePage();
+         });
+         findViewById(R.id.buttonPageBack).setOnClickListener(view -> closeSecondaryPage());
++        findViewById(R.id.buttonLicenseFull).setOnClickListener(view -> showLicenseDialog());
+         configureDrawerAppearance();
+         tabRead.setOnClickListener(view -> selectTab(true));
+         tabWrite.setOnClickListener(view -> selectTab(false));
+@@ -742,6 +745,7 @@
+     private void showMaterialPage() {
+         textPageTitle.setText(R.string.page_materials);
+         materialPage.setVisibility(View.VISIBLE);
++        licensePage.setVisibility(View.GONE);
+         textPageScroll.setVisibility(View.GONE);
+         renderMaterialLibrary();
+         secondaryPage.setVisibility(View.VISIBLE);
+@@ -750,6 +754,7 @@
+     private void showInfoPage() {
+         textPageTitle.setText(R.string.page_info);
+         materialPage.setVisibility(View.GONE);
++        licensePage.setVisibility(View.GONE);
+         textPageScroll.setVisibility(View.VISIBLE);
+         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
+         textPageBody.setText(
+@@ -771,14 +776,20 @@
+     private void showLicensePage() {
+         textPageTitle.setText(R.string.page_license);
+         materialPage.setVisibility(View.GONE);
+-        textPageScroll.setVisibility(View.VISIBLE);
+-        textPageBody.setMovementMethod(null);
+-        textPageBody.setTypeface(android.graphics.Typeface.MONOSPACE);
+-        try {
+-            textPageBody.setText(readRawText(R.raw.gpl_3));
+-        } catch (IOException exception) {
+-            textPageBody.setText("Lizenztext konnte nicht geladen werden: " + exception.getMessage());
+-        }
++        textPageScroll.setVisibility(View.GONE);
++        licensePage.setVisibility(View.VISIBLE);
++
++        TextView version = findViewById(R.id.textLicenseVersion);
++        version.setText(getString(R.string.license_app_version, BuildConfig.VERSION_NAME));
++
++        TextView upstream = findViewById(R.id.textLicenseUpstream);
++        Linkify.addLinks(upstream, Linkify.WEB_URLS);
++        upstream.setMovementMethod(LinkMovementMethod.getInstance());
++
++        TextView source = findViewById(R.id.textLicenseSource);
++        Linkify.addLinks(source, Linkify.WEB_URLS);
++        source.setMovementMethod(LinkMovementMethod.getInstance());
++
+         secondaryPage.setVisibility(View.VISIBLE);
+     }
+ 
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/drawable/bg_license_badge.xml	2026-08-25 08:49:02.288201297 +0000
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
++    <solid android:color="@color/primary_light" />
++    <stroke android:width="1dp" android:color="@color/primary" />
++    <corners android:radius="999dp" />
++    <padding android:left="12dp" android:top="6dp" android:right="12dp" android:bottom="6dp" />
++</shape>
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/activity_main.xml	2026-08-25 08:49:19.697919061 +0000
+@@ -778,6 +778,9 @@
+             </LinearLayout>
+         </LinearLayout>
+ 
++        <include
++            layout="@layout/page_license" />
++
+         <ScrollView
+             android:id="@+id/textPageScroll"
+             android:layout_width="match_parent"
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/layout/page_license.xml	2026-08-25 08:49:02.289104793 +0000
+@@ -0,0 +1,178 @@
++<?xml version="1.0" encoding="utf-8"?>
++<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@+id/licensePage"
++    android:layout_width="match_parent"
++    android:layout_height="0dp"
++    android:layout_weight="1"
++    android:fillViewport="true"
++    android:visibility="gone">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="vertical"
++        android:paddingStart="16dp"
++        android:paddingTop="20dp"
++        android:paddingEnd="16dp"
++        android:paddingBottom="28dp">
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:background="@drawable/bg_card"
++            android:orientation="vertical">
++
++            <TextView
++                android:id="@+id/textLicenseVersion"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:textColor="@color/text_primary"
++                android:textSize="22sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="12dp"
++                android:background="@drawable/bg_license_badge"
++                android:text="@string/license_badge"
++                android:textColor="@color/primary_dark"
++                android:textSize="13sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="16dp"
++                android:text="@string/license_intro"
++                android:textColor="@color/text_secondary"
++                android:textSize="15sp"
++                android:lineSpacingExtra="2dp" />
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="14dp"
++            android:background="@drawable/bg_section"
++            android:orientation="vertical">
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:text="@string/license_origin_title"
++                android:textColor="@color/text_primary"
++                android:textSize="17sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:id="@+id/textLicenseUpstream"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="8dp"
++                android:text="@string/license_origin_body"
++                android:textColor="@color/text_secondary"
++                android:textIsSelectable="true"
++                android:textSize="15sp"
++                android:lineSpacingExtra="2dp" />
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="14dp"
++            android:background="@drawable/bg_section"
++            android:orientation="vertical">
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:text="@string/license_modification_title"
++                android:textColor="@color/text_primary"
++                android:textSize="17sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="8dp"
++                android:text="@string/license_modification_body"
++                android:textColor="@color/text_secondary"
++                android:textSize="15sp"
++                android:lineSpacingExtra="2dp" />
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="14dp"
++            android:background="@drawable/bg_section"
++            android:orientation="vertical">
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:text="@string/license_terms_title"
++                android:textColor="@color/text_primary"
++                android:textSize="17sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="8dp"
++                android:text="@string/license_terms_body"
++                android:textColor="@color/text_secondary"
++                android:textSize="15sp"
++                android:lineSpacingExtra="2dp" />
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="14dp"
++            android:background="@drawable/bg_section"
++            android:orientation="vertical">
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:text="@string/license_source_title"
++                android:textColor="@color/text_primary"
++                android:textSize="17sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:id="@+id/textLicenseSource"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="8dp"
++                android:text="@string/license_source_body"
++                android:textColor="@color/primary"
++                android:textIsSelectable="true"
++                android:textSize="15sp" />
++        </LinearLayout>
++
++        <Button
++            android:id="@+id/buttonLicenseFull"
++            android:layout_width="match_parent"
++            android:layout_height="64dp"
++            android:layout_marginTop="18dp"
++            android:background="@drawable/bg_primary_button"
++            android:text="@string/button_license_full"
++            android:textAllCaps="false"
++            android:textColor="@color/on_primary"
++            android:textSize="16sp"
++            android:textStyle="bold" />
++
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="12dp"
++            android:gravity="center"
++            android:text="@string/license_notice_footer"
++            android:textColor="@color/text_secondary"
++            android:textSize="12sp" />
++
++    </LinearLayout>
++</ScrollView>
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/app/src/main/res/values/strings.xml	2026-08-25 08:49:19.063176552 +0000
+@@ -25,8 +25,21 @@
+     <string name="menu_license">Lizenz</string>
+     <string name="page_materials">Materialbibliothek</string>
+     <string name="page_info">Info</string>
+-    <string name="page_license">Lizenz</string>
+-    <string name="version_footer">Version 1.1.17</string>
++    <string name="page_license">Lizenz &amp; Open Source</string>
++    <string name="version_footer">Version 1.1.18</string>
++    <string name="license_app_version">Spool Maker Android %1$s</string>
++    <string name="license_badge">GPL-3.0-or-later</string>
++    <string name="license_intro">Freie Software mit offenem Quellcode. Die Hinweise auf dieser Seite fassen Herkunft, Änderungsstand und Lizenz zusammen.</string>
++    <string name="license_origin_title">Herkunft &amp; Urheberrecht</string>
++    <string name="license_origin_body">Basierend auf Spool-Maker von Dale A. Osborne.\nCopyright &#169; 2021 Dale Osborne.\nhttps://github.com/DA-Osborne/Spool-Maker</string>
++    <string name="license_modification_title">Android-Port &amp; Änderungen</string>
++    <string name="license_modification_body">Dies ist eine veränderte Android-Fassung des Upstream-Projekts. Änderungsstand dieser Fassung: 25.08.2026. Die Android-Portierung und späteren Änderungen werden unter GPL-3.0-or-later veröffentlicht; Rechte an den jeweiligen Beiträgen verbleiben bei den jeweiligen Beitragenden.</string>
++    <string name="license_terms_title">Lizenzhinweis</string>
++    <string name="license_terms_body">Weitergabe und Änderungen sind unter den Bedingungen der GNU General Public License Version 3 oder jeder späteren Version zulässig. Soweit gesetzlich zulässig, wird die Software ohne Gewährleistung bereitgestellt. Der vollständige Lizenztext ist über die Schaltfläche unten verfügbar.</string>
++    <string name="license_source_title">Quellcode</string>
++    <string name="license_source_body">https://github.com/joker-mik/SpoolMakerAndroid</string>
++    <string name="button_license_full">Vollständigen GPL-3.0-Lizenztext anzeigen</string>
++    <string name="license_notice_footer">Nicht verbunden mit oder unterstützt von UltiMaker oder dem Upstream-Projekt.</string>
+     <string name="label_uid">UID</string>
+     <string name="label_guid">Material-GUID</string>
+     <string name="label_material">Material</string>
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/docs/GITHUB_RELEASE.md	2026-08-25 08:49:33.534479438 +0000
+@@ -49,15 +49,15 @@
+ 
+ Die Version in `app/build.gradle` muss zum Tag passen. Fuer diesen Stand:
+ 
+-- `versionName '1.1.17'`
+-- `versionCode 27`
+-- Tag `v1.1.17`
++- `versionName '1.1.18'`
++- `versionCode 28`
++- Tag `v1.1.18`
+ 
+ Danach:
+ 
+ ```bash
+-git tag v1.1.17
+-git push origin v1.1.17
++git tag v1.1.18
++git push origin v1.1.18
+ ```
+ 
+ Der Workflow baut die signierte APK und legt automatisch einen GitHub Release
+diff -ruN /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template
+--- /mnt/data/spoolmaker_orig/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template	2026-08-25 08:05:32.000000000 +0000
++++ /mnt/data/spoolmaker_work/SpoolMakerAndroid-main/fdroid/de.spoolmaker.android.yml.template	2026-08-25 08:49:33.534384475 +0000
+@@ -8,14 +8,14 @@
+ Repo: https://github.com/GITHUB_USER/SpoolMakerAndroid.git
+ 
+ Builds:
+-  - versionName: 1.1.17
+-    versionCode: 27
+-    commit: FULL_COMMIT_SHA_OF_V1.1.17
++  - versionName: 1.1.18
++    versionCode: 28
++    commit: FULL_COMMIT_SHA_OF_V1.1.18
+     subdir: app
+     gradle:
+       - yes
+ 
+ AutoUpdateMode: Version
+ UpdateCheckMode: Tags
+-CurrentVersion: 1.1.17
+-CurrentVersionCode: 27
++CurrentVersion: 1.1.18
++CurrentVersionCode: 28
