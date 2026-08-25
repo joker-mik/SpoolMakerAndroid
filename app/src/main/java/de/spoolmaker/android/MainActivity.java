@@ -89,8 +89,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private TextView textStation;
     private TextView textCrc;
     private TextView textFullDetails;
+    private TextView textDetailsEmpty;
     private TextView textRawDump;
+    private TextView textRawDumpVisible;
+    private TextView textRawEmpty;
     private Button buttonToggleRaw;
+    private Button buttonCopySummary;
     private Button buttonCopyDetails;
     private Button buttonCopyRaw;
     private ImageButton buttonEdit;
@@ -442,8 +446,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         textStation = findViewById(R.id.textStation);
         textCrc = findViewById(R.id.textCrc);
         textFullDetails = findViewById(R.id.textFullDetails);
+        textDetailsEmpty = findViewById(R.id.textDetailsEmpty);
         textRawDump = findViewById(R.id.textRawDump);
+        textRawDumpVisible = findViewById(R.id.textRawDumpVisible);
+        textRawEmpty = findViewById(R.id.textRawEmpty);
         buttonToggleRaw = findViewById(R.id.buttonToggleRaw);
+        buttonCopySummary = findViewById(R.id.buttonCopySummary);
         buttonCopyDetails = findViewById(R.id.buttonCopyDetails);
         buttonCopyRaw = findViewById(R.id.buttonCopyRaw);
         buttonEdit = findViewById(R.id.buttonEdit);
@@ -1285,9 +1293,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         lastDetailsText = buildFullDetails(uid, decoded);
         lastRawDumpText = buildRawDump(memory);
         textFullDetails.setText(lastDetailsText);
+        textDetailsEmpty.setVisibility(View.GONE);
+        textFullDetails.setVisibility(View.VISIBLE);
+
         textRawDump.setText(lastRawDumpText);
         textRawDump.setVisibility(View.GONE);
+        textRawDumpVisible.setText(lastRawDumpText);
+        textRawEmpty.setVisibility(View.GONE);
+        textRawDumpVisible.setVisibility(View.VISIBLE);
+
         buttonToggleRaw.setText(R.string.button_show_raw);
+        buttonCopySummary.setEnabled(true);
         buttonCopyDetails.setEnabled(true);
         buttonCopyRaw.setEnabled(true);
         buttonToggleRaw.setEnabled(true);
