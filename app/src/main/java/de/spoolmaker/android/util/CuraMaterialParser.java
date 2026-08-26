@@ -7,7 +7,8 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.FilterInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -15,28 +16,30 @@ import java.math.RoundingMode;
 import java.util.Locale;
 
 public final class CuraMaterialParser {
-    public static final long MAX_INPUT_BYTES = 2L * 1024L * 1024L;
+    public static final long MAX_INPUT_BYTES = 50L * 1024L;
 
     private static final long MAX_UNSIGNED_INT = 0xFFFF_FFFFL;
     private static final int MAX_XML_DEPTH = 64;
     private static final int MAX_START_TAGS = 20_000;
     private static final int MAX_FIELD_CHARS = 4096;
-    private static final String FEATURE_DISALLOW_DOCTYPE =
-            "http://apache.org/xml/features/disallow-doctype-decl";
 
     public MaterialProfile parse(InputStream inputStream) throws IOException, XmlPullParserException {
         if (inputStream == null) {
             throw new IllegalArgumentException("Kein XML-Datenstrom vorhanden.");
         }
 
+        // Do not rely on optional XmlPullParser feature flags here. Android devices
+        // can ship different XmlPull implementations and some of them reject calls
+        // such as FEATURE_PROCESS_DOCDECL/FEATURE_VALIDATION as "unsupported feature".
+        // Instead, read one bounded file, reject DTD/entity declarations ourselves,
+        // and then use the parser with its normal, widely supported configuration.
+        byte[] xml = readLimited(inputStream, MAX_INPUT_BYTES);
+        rejectForbiddenDeclarations(xml);
+
         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
         factory.setNamespaceAware(true);
-        hardenFactory(factory);
-
         XmlPullParser parser = factory.newPullParser();
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false);
-        parser.setFeature(XmlPullParser.FEATURE_VALIDATION, false);
-        parser.setInput(new LimitedInputStream(inputStream, MAX_INPUT_BYTES), "UTF-8");
+        parser.setInput(new ByteArrayInputStream(xml), "UTF-8");
 
         String brand = "";
         String material = "";
@@ -49,10 +52,6 @@ public final class CuraMaterialParser {
 
         int event = parser.getEventType();
         while (event != XmlPullParser.END_DOCUMENT) {
-            if (event == XmlPullParser.DOCDECL) {
-                throw new XmlPullParserException(
-                        "DOCTYPE/DTD ist in Materialdateien nicht zugelassen.", parser, null);
-            }
             if (event == XmlPullParser.START_TAG) {
                 startTags++;
                 if (startTags > MAX_START_TAGS) {
@@ -102,7 +101,7 @@ public final class CuraMaterialParser {
                     }
                 }
             }
-            event = parser.nextToken();
+            event = parser.next();
         }
 
         if (!rootSeen) {
@@ -121,17 +120,54 @@ public final class CuraMaterialParser {
         return new MaterialProfile(brand, material, color, guid, spoolWeightMg);
     }
 
-    private static void hardenFactory(XmlPullParserFactory factory) throws XmlPullParserException {
-        // Android's security guidance recommends rejecting DTD declarations. Some
-        // XmlPull implementations do not expose the Apache feature; in that case
-        // FEATURE_PROCESS_DOCDECL=false plus the explicit DOCDECL check above is
-        // the portable fallback.
-        try {
-            factory.setFeature(FEATURE_DISALLOW_DOCTYPE, true);
-        } catch (XmlPullParserException unsupportedFeature) {
-            factory.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false);
+    private static byte[] readLimited(InputStream inputStream, long limit) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        long total = 0L;
+        int count;
+        while ((count = inputStream.read(buffer)) != -1) {
+            total += count;
+            if (total > limit) {
+                throw new IOException("Materialdatei ist größer als " + limit + " Byte.");
+            }
+            output.write(buffer, 0, count);
         }
-        factory.setFeature(XmlPullParser.FEATURE_VALIDATION, false);
+        return output.toByteArray();
+    }
+
+    private static void rejectForbiddenDeclarations(byte[] xml) throws XmlPullParserException {
+        if (containsAsciiIgnoreCase(xml, "<!DOCTYPE")
+                || containsAsciiIgnoreCase(xml, "<!ENTITY")) {
+            throw new XmlPullParserException(
+                    "DOCTYPE/DTD/ENTITY ist in Materialdateien nicht zugelassen.");
+        }
+    }
+
+    private static boolean containsAsciiIgnoreCase(byte[] data, String needle) {
+        if (data == null || needle == null || needle.isEmpty() || data.length < needle.length()) {
+            return false;
+        }
+        for (int start = 0; start <= data.length - needle.length(); start++) {
+            boolean match = true;
+            for (int offset = 0; offset < needle.length(); offset++) {
+                int actual = data[start + offset] & 0xFF;
+                char expected = needle.charAt(offset);
+                if (actual >= 'a' && actual <= 'z') {
+                    actual -= ('a' - 'A');
+                }
+                if (expected >= 'a' && expected <= 'z') {
+                    expected = (char) (expected - ('a' - 'A'));
+                }
+                if (actual != expected) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isDirectWeightTag(String key) {
@@ -195,41 +231,6 @@ public final class CuraMaterialParser {
             return cleaned;
         } catch (IllegalStateException exception) {
             return "";
-        }
-    }
-
-    private static final class LimitedInputStream extends FilterInputStream {
-        private final long limit;
-        private long consumed;
-
-        LimitedInputStream(InputStream inputStream, long limit) {
-            super(inputStream);
-            this.limit = limit;
-        }
-
-        @Override
-        public int read() throws IOException {
-            int value = super.read();
-            if (value >= 0) {
-                increment(1L);
-            }
-            return value;
-        }
-
-        @Override
-        public int read(byte[] buffer, int offset, int length) throws IOException {
-            int count = super.read(buffer, offset, length);
-            if (count > 0) {
-                increment(count);
-            }
-            return count;
-        }
-
-        private void increment(long count) throws IOException {
-            consumed += count;
-            if (consumed > limit) {
-                throw new IOException("Materialdatei ist größer als " + limit + " Byte.");
-            }
         }
     }
 }

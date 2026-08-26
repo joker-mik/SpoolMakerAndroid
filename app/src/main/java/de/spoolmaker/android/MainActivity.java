@@ -65,7 +65,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
     private static final int REQUEST_IMPORT_MATERIAL = 1401;
-    private static final int MAX_IMPORT_FILES = 32;
     private static final AtomicBoolean NFC_IO_ACTIVE = new AtomicBoolean(false);
 
     private enum NfcState {
@@ -453,16 +452,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
 
         List<Uri> uris = new ArrayList<>();
-        boolean tooMany = false;
         ClipData clipData = data.getClipData();
         if (clipData != null) {
             for (int index = 0; index < clipData.getItemCount(); index++) {
                 Uri uri = clipData.getItemAt(index).getUri();
                 if (uri != null && !uris.contains(uri)) {
-                    if (uris.size() >= MAX_IMPORT_FILES) {
-                        tooMany = true;
-                        break;
-                    }
                     uris.add(uri);
                 }
             }
@@ -470,18 +464,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             uris.add(data.getData());
         }
 
-        if (tooMany) {
-            showUserMessage(StatusKind.WARNING,
-                    "Es können höchstens " + MAX_IMPORT_FILES
-                            + " Materialdateien pro Import verarbeitet werden.");
-            return;
-        }
         if (uris.isEmpty()) {
             showUserMessage(StatusKind.WARNING, "Keine Materialdatei ausgewählt.");
             return;
         }
 
-        showUserMessage(StatusKind.INFO, "Materialimport läuft …");
+        showUserMessage(StatusKind.INFO, uris.size() == 1
+                ? "Materialimport läuft …"
+                : "Materialimport läuft (" + uris.size() + " Dateien) …");
         importExecutor.execute(() -> importMaterials(uris));
     }
 
@@ -1030,13 +1020,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         return false;
     }
 
-	@android.annotation.SuppressLint("GestureBackNavigation")
-	@Override
-	public void onBackPressed() {
-		if (!handleBackNavigation()) {
-			super.onBackPressed();
-		}
-	}
+    @android.annotation.SuppressLint("GestureBackNavigation")
+    @Override
+    public void onBackPressed() {
+        if (!handleBackNavigation()) {
+            super.onBackPressed();
+        }
+    }
 
     private void registerModernBackHandler() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
