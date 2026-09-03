@@ -16,8 +16,8 @@ android {
         applicationId 'de.spoolmaker.android'
         minSdk 23
         targetSdk 36
-        versionCode 29
-        versionName '1.2.0'
+        versionCode 30
+        versionName '1.2.1'
         testInstrumentationRunner 'android.app.InstrumentationTestRunner'
     }
 
@@ -34,6 +34,11 @@ android {
     }
     buildFeatures {
         buildConfig true
+    }
+    
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     buildTypes {
