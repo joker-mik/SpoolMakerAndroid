@@ -1,0 +1,1 @@
+Verbesserte F-Droid-Kompatibilitaet durch Entfernen undurchsichtiger Abhaengigkeitsmetadaten aus Release-APKs.
