@@ -1,4 +1,4 @@
-# Spool Maker Android 1.2.0
+# Spool Maker Android 1.2.1
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
@@ -11,9 +11,9 @@ https://github.com/DA-Osborne/Spool-Maker
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.2.0
+## Stand 1.2.1
 
-Version 1.2.0 ist die initiale, gehaertete 1.2-Fassung dieses Android-Ports.
+Version 1.2.1 ist die initiale, gehaertete 1.2-Fassung dieses Android-Ports.
 Die in 1.1.18 aktualisierten Lizenz-, Herkunfts- und Aenderungshinweise wurden
 inhaltlich beibehalten.
 
