@@ -81,8 +81,8 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.2.0
-versionCode:   29
+versionName:   1.2.1
+versionCode:   30
 ```
 
 Der `versionCode` wurde absichtlich nicht auf 1 zurueckgesetzt, damit eine mit
