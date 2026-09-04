@@ -150,7 +150,7 @@ Dieses Repository enthaelt Workflows unter `.github/workflows/`:
 
 - `ci.yml` fuehrt Standalone-Codec-Test, Android-Unit-Tests, Lint und Debug-Build
   aus.
-- `release.yml` erwartet fuer diesen Stand den Git-Tag `v1.2.0`, prueft die
+- `release.yml` erwartet fuer diesen Stand den Git-Tag `v1.2.1`, prueft die
   Versionskonsistenz und baut danach eine signierte Release-APK.
 
 Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
