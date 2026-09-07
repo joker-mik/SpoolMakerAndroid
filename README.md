@@ -132,7 +132,8 @@ app/src/main/res/
 ## Hinweise zum Tag-Schreiben
 
 Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG215 oder NTAG216
-verwenden. Ich verwende nur NTAG216, die NTAG215 funktionieren theoretisch, ich habe es nie ausprobiert. 
+verwenden. Ich verwende nur NTAG216, die NTAG215 funktionieren theoretisch, ich habe 
+diese jedoch nie ausprobiert. 
 Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-,
 Passwort- und Konfigurationsseiten werden nur gelesen, nicht beschrieben.
 
