@@ -1,21 +1,40 @@
 Categories:
-  - Connectivity
+  - Inventory
 License: GPL-3.0-or-later
+
+AuthorName: joker-mik
+AuthorWebSite: https://github.com/joker-mik
+
 SourceCode: https://github.com/joker-mik/SpoolMakerAndroid
 IssueTracker: https://github.com/joker-mik/SpoolMakerAndroid/issues
+Changelog: https://github.com/joker-mik/SpoolMakerAndroid/releases
+
+AutoName: Spool Maker
 
 RepoType: git
 Repo: https://github.com/joker-mik/SpoolMakerAndroid.git
 
+Binaries: https://github.com/joker-mik/SpoolMakerAndroid/releases/download/v%v/SpoolMaker-%v.apk
+
 Builds:
   - versionName: 1.2.3
     versionCode: 32
-    commit: FULL_COMMIT_SHA_OF_V1.2.3
+    commit: 086b061eb347711b3b63a88f97a6c8f909b642af
     subdir: app
+
+    sudo:
+      - echo "deb https://deb.debian.org/debian trixie main" > /etc/apt/sources.list.d/trixie.list
+      - apt-get update
+      - apt-get install -y -t trixie openjdk-21-jdk-headless
+      - update-alternatives --auto java
+
     gradle:
       - yes
 
+AllowedAPKSigningKeys: 61284f96a285d7af755f9a5593b786fd9b74686fa4616198efcee903c505d3eb
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
+
 CurrentVersion: 1.2.3
 CurrentVersionCode: 32
