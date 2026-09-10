@@ -1,0 +1,1 @@
+Added English and German UI localization, a full-screen language selector, and system-language handling with English fallback. NFC tag format and material handling remain unchanged.

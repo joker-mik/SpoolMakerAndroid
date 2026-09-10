@@ -1,0 +1,1 @@
+Englische und deutsche Oberfläche ergänzt, Vollbild-Sprachauswahl hinzugefügt und Systemsprache mit englischem Fallback umgesetzt. NFC-Tag-Format und Materialverarbeitung bleiben unverändert.

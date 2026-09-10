@@ -1,10 +1,15 @@
-Spool Maker ist eine freie Android-App zum Lesen und Schreiben kompatibler
-NFC-Spulentags auf NTAG215- und NTAG216-Basis.
+Spool Maker ist eine freie Android-App für die NFC-Spulentags von UltiMaker-3D-Druckern.
 
-Die App kann Materialinformationen und Gewichtsangaben auslesen, neue Tags
-schreiben und Cura/UltiMaker-Materialdateien importieren. Eine lokale
-Materialbibliothek verwaltet Hersteller, Material, Farbe, GUID und
-Spulengewicht.
+UltiMaker-Filamentspulen verwenden NFC-Tags (RFID), über die der Drucker Material- und Spuleninformationen erkennt. Mit Spool Maker kannst du die auf solchen Tags gespeicherten Daten direkt mit einem NFC-fähigen Android-Gerät auslesen. Die App ist darauf ausgelegt, sowohl originale UltiMaker-Spulentags als auch mit Spool Maker beschriebene Tags auszulesen.
 
-Spool Maker ist Community-Software und kein offizielles Produkt von UltiMaker
-oder DA-Osborne. Der Quellcode steht unter GPL-3.0-or-later.
+Außerdem kannst du neue UltiMaker-kompatible Spulentags auf beschreibbaren NTAG-Tags erstellen. Die untersuchten Originaltags von UltiMaker sind NTAG216. Spool Maker unterstützt beim Schreiben zusätzlich NTAG215; die benötigten 228 Byte passen auch in deren Benutzerspeicher. NTAG215 wurden vom Projektbetreiber jedoch bisher nicht praktisch mit einem UltiMaker-Drucker getestet.
+
+Materialprofile lassen sich aus Cura-/UltiMaker-`.xml.fdm_material`-Dateien importieren und in einer lokalen Materialbibliothek verwalten. Beim Schreiben legst du Material, Gesamtgewicht und verbleibende Menge fest. Für von Spool Maker geschriebene Tags kann dem Datumsfeld zusätzlich eine Bedeutung zugeordnet werden: hergestellt am, gekauft am, geöffnet am, erstellt am oder kein Datum.
+
+Beim Lesen zeigt Spool Maker unter anderem UID, Material-GUID, Gesamt- und Restmenge, Datums-/Zeitinformationen, Batch-/Stationsdaten und Integritätsinformationen. Für die technische Kontrolle können außerdem alle dekodierten Werte sowie die Rohdaten des Tags angezeigt und kopiert werden.
+
+Vor dem Schreiben prüft die App den Tag-Typ sowie relevante Sperr- und Schutzbereiche. Nach dem Schreiben werden die Daten erneut gelesen und verifiziert, damit fehlerhafte oder unvollständige Schreibvorgänge erkannt werden.
+
+Die App arbeitet vollständig lokal: keine Internet-Berechtigung, kein Konto, keine Werbung, keine Tracker und keine Telemetrie.
+
+Das unterstützte Tag-Format basiert auf unabhängiger Analyse und Reverse Engineering originaler UltiMaker-NFC-Spulentags und ausgewählter Drucker-Firmware. Spool Maker ist ein unabhängiges Community-Projekt und kein offizielles Produkt von UltiMaker. Die Kompatibilität kann je nach Druckermodell und Firmware-Version abweichen.

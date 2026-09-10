@@ -1,9 +1,15 @@
-Spool Maker is a free Android app for reading and writing compatible NTAG215 and NTAG216
-NFC spool tags.
+Spool Maker is a free Android app for the NFC spool tags used with UltiMaker 3D printers.
 
-It can read material and weight information, write new tags, and import
-Cura/UltiMaker material files. A local material library stores manufacturer,
-material, color, GUID, and spool weight.
+UltiMaker filament spools use NFC tags (RFID) so the printer can identify material and spool information. With Spool Maker, you can read the data stored on these tags directly with an NFC-enabled Android device. The app is designed to read both original UltiMaker spool tags and tags written with Spool Maker.
 
-Spool Maker is community software and is not an official product of UltiMaker
-or DA-Osborne. The source code is licensed under GPL-3.0-or-later.
+You can also create new UltiMaker-compatible spool tags on writable NTAG media. The original UltiMaker tags examined for this project are NTAG216. Spool Maker also supports writing NTAG215 tags; the 228-byte payload fits in their user memory as well. However, NTAG215 has not yet been tested by the project maintainer with an actual UltiMaker printer.
+
+Material profiles can be imported from Cura/UltiMaker `.xml.fdm_material` files and managed in a local material library. When writing a tag, you can select the material, total spool weight and remaining amount. For tags written by Spool Maker, the date field can also be assigned a meaning: manufactured, purchased, opened, created, or no date.
+
+When reading a tag, Spool Maker displays information such as the UID, material GUID, total and remaining amount, date/time information, batch and station data, and integrity information. For technical inspection, all decoded values and the raw tag data can also be viewed and copied.
+
+Before writing, the app checks the tag type and relevant lock and protection areas. After writing, the data is read back and verified so incomplete or failed writes can be detected.
+
+The app works entirely locally: no Internet permission, no account, no ads, no trackers and no telemetry.
+
+The supported tag format is based on independent analysis and reverse engineering of original UltiMaker NFC spool tags and selected printer firmware. Spool Maker is an independent community project and is not an official UltiMaker product. Compatibility may vary with printer model and firmware version.

@@ -1,1 +1,1 @@
-Read and write NFC spool tags and manage material data
+Read and create NFC spool tags for UltiMaker 3D printers
