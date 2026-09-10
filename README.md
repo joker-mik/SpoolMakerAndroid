@@ -1,4 +1,4 @@
-# Spool Maker Android 1.2.1
+# Spool Maker Android 1.2.2
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
@@ -8,17 +8,31 @@ NTAG216-Tags.
 Upstream / technische Grundlage:
 https://github.com/DA-Osborne/Spool-Maker
 
+Aktuelles Release:
+https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.2
+
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.2.1
+## Stand 1.2.2
 
-Version 1.2.1 ist die initiale, gehaertete 1.2-Fassung dieses Android-Ports.
-Die in 1.1.18 aktualisierten Lizenz-, Herkunfts- und Aenderungshinweise wurden
-inhaltlich beibehalten.
+Version 1.2.2 erweitert den gehaerteten 1.2-Stand um eine englische und deutsche
+Benutzeroberflaeche. Die App verwendet standardmaessig die Systemsprache. Ist
+die Systemsprache Deutsch, wird die deutsche Oberflaeche verwendet; bei
+Englisch die englische. Fuer alle anderen Systemsprachen dient Englisch als
+Fallback.
+
+Die Sprache kann jederzeit ueber das Seitenmenue geaendert werden. Die
+Sprachauswahl ist wie Materialbibliothek, Info und Lizenz als eigene Seite mit
+Zurueck-Navigation umgesetzt. Zur Auswahl stehen **System default / Systemkonfiguration**,
+**German / Deutsch** und **English / Englisch**.
 
 Enthalten sind unter anderem:
 
+- Englische und deutsche UI-Lokalisierung mit systemabhaengiger Vorauswahl und
+  englischem Fallback fuer nicht unterstuetzte Systemsprachen.
+- Vollbild-Sprachauswahl mit Zurueck-Pfeil und sofortiger Umschaltung der
+  Oberflaechensprache.
 - NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
 - Explizite Tag-Erkennung per `GET_VERSION`; zugelassen werden NTAG215 und
   NTAG216.
@@ -46,13 +60,17 @@ Enthalten sind unter anderem:
 - Materialbibliothek als mehrzeilige Liste mit Symbolbuttons fuer Hinzufuegen,
   Bearbeiten und Loeschen.
 - NFC-Bereitschaft und Schreibfortschritt werden sichtbar angezeigt.
-- Info und Lizenz sind eigene Seiten mit Zurueck-Navigation.
+- Materialbibliothek, Sprache, Info und Lizenz sind eigene Seiten mit
+  Zurueck-Navigation.
 - Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und den
   vollstaendigen GPL-Text.
 
+Das NFC-Tag-Format und die Materialverarbeitung wurden durch die
+Sprachunterstuetzung nicht veraendert.
+
 ## Projekt oeffnen
 
-1. ZIP entpacken.
+1. ZIP entpacken oder das Repository klonen.
 2. Den Projektordner in Android Studio oeffnen.
 3. Android SDK Platform 36 installieren lassen, falls sie fehlt.
 4. Gradle-Synchronisierung ausfuehren.
@@ -81,20 +99,23 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.2.1
-versionCode:   30
+versionName:   1.2.2
+versionCode:   31
 ```
 
-Der `versionCode` wurde absichtlich nicht auf 1 zurueckgesetzt, damit eine mit
-Code 28 installierte 1.1.18-Fassung auf 1.2.0 aktualisiert werden kann.
+Der `versionCode` wird ueber Releases hinweg fortlaufend erhoeht, damit Android
+vorhandene Installationen als aktualisierbar erkennt.
 
-Der private Update-Schluessel ist **nicht** im Quellarchiv enthalten. Fuer einen
+Der private Update-Schluessel ist **nicht** im Repository enthalten. Fuer einen
 signierten Release-Build `signing.properties.example` nach
 `signing.properties` kopieren, Pfad und Kennwoerter eintragen und danach:
 
 ```bash
 ./gradlew assembleRelease
 ```
+
+Das offizielle GitHub-Release wird ueber GitHub Actions mit dem dort hinterlegten
+Release-Schluessel signiert.
 
 ## Codec-Selbsttest ohne Android SDK
 
@@ -115,6 +136,7 @@ Record-Layout, CRC und Signaturmarker.
 
 ```text
 app/src/main/java/de/spoolmaker/android/
+  LocaleHelper.java
   MainActivity.java
   model/MaterialProfile.java
   nfc/NtagIo.java
@@ -125,22 +147,33 @@ app/src/main/java/de/spoolmaker/android/
 app/src/main/res/
   layout/
   drawable/
-  values/
+  values/       # englische Standard-Ressourcen
+  values-de/    # deutsche Ressourcen
   raw/gpl_3.txt
 ```
 
 ## Hinweise zum Tag-Schreiben
 
 Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG215 oder NTAG216
-verwenden. Ich verwende nur NTAG216, die NTAG215 funktionieren theoretisch, ich habe 
-diese jedoch nie ausprobiert. 
-Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-,
-Passwort- und Konfigurationsseiten werden nur gelesen, nicht beschrieben.
+verwenden. Die Implementierung unterstuetzt beide Tag-Groessen; der
+Standalone-Selbsttest deckt beide Speicherabbild-Groessen ab. NTAG215 wurde vom
+Projektbetreiber bisher nicht auf echter Hardware getestet.
+
+Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-, Passwort- und
+Konfigurationsseiten werden nur gelesen, nicht beschrieben.
 
 Mehrseitige NFC-EEPROM-Schreibvorgaenge sind nicht atomar. Wird ein Tag waehrend
 des Schreibens aus dem Feld entfernt, kann er teilweise veraendert sein. Die App
 haelt den Schreibdialog deshalb bis zum Ende der Ruecklesepruefung offen und
 weist im Fehlerfall auf diesen Zustand hin.
+
+## Datenschutz und Berechtigungen
+
+Die App arbeitet lokal auf dem Geraet. Sie enthaelt keine Internet-Berechtigung,
+keine Tracker, Analytics, Telemetrie, Werbung oder Benutzerkonten. Fuer die
+Kernfunktion werden NFC sowie die im Manifest deklarierten, nicht gefaehrlichen
+Systemfunktionen verwendet; gefaehrliche Android-Laufzeitberechtigungen werden
+nicht angefordert.
 
 ## Lizenz
 
@@ -152,8 +185,8 @@ Dieses Repository enthaelt Workflows unter `.github/workflows/`:
 
 - `ci.yml` fuehrt Standalone-Codec-Test, Android-Unit-Tests, Lint und Debug-Build
   aus.
-- `release.yml` erwartet fuer diesen Stand den Git-Tag `v1.2.1`, prueft die
-  Versionskonsistenz und baut danach eine signierte Release-APK.
+- `release.yml` reagiert auf Versions-Tags (`v*`), prueft, dass der Tag zur
+  `versionName` passt, und baut danach eine signierte Release-APK.
 
 Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
 und gehoeren niemals ins Repository.
