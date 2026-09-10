@@ -1,5 +1,5 @@
 Categories:
-  - Development
+  - Connectivity
 License: GPL-3.0-or-later
 SourceCode: https://github.com/joker-mik/SpoolMakerAndroid
 IssueTracker: https://github.com/joker-mik/SpoolMakerAndroid/issues
@@ -8,14 +8,14 @@ RepoType: git
 Repo: https://github.com/joker-mik/SpoolMakerAndroid.git
 
 Builds:
-  - versionName: 1.2.0
-    versionCode: 29
-    commit: FULL_COMMIT_SHA_OF_V1.2.0
+  - versionName: 1.2.3
+    versionCode: 32
+    commit: FULL_COMMIT_SHA_OF_V1.2.3
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.2.0
-CurrentVersionCode: 29
+CurrentVersion: 1.2.3
+CurrentVersionCode: 32
