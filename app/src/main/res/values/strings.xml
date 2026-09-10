@@ -31,7 +31,7 @@
     <string name="version_format">Version %1$s</string>
     <string name="language_title">Language</string>
     <string name="language_system">System default</string>
-    <string name="language_german">Deutsch</string>
+    <string name="language_german">German</string>
     <string name="language_english">English</string>
     <string name="action_cancel">Cancel</string>
     <string name="license_app_version">Spool Maker Android %1$s</string>

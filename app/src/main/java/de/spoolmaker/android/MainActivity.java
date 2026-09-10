@@ -65,6 +65,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity implements NfcAdapter.ReaderCallback {
     private static final int REQUEST_IMPORT_MATERIAL = 1401;
+    private static final String EXTRA_REOPEN_LANGUAGE_PAGE = "de.spoolmaker.android.extra.REOPEN_LANGUAGE_PAGE";
     private static final AtomicBoolean NFC_IO_ACTIVE = new AtomicBoolean(false);
 
     private enum NfcState {
@@ -128,6 +129,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private View drawerOverlay;
     private View secondaryPage;
     private View materialPage;
+    private View languagePage;
     private View licensePage;
     private View textPageScroll;
     private LinearLayout materialList;
@@ -139,6 +141,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private ImageView tabWriteIcon;
     private TextView textPageTitle;
     private TextView textPageBody;
+    private android.widget.RadioButton radioLanguageSystem;
+    private android.widget.RadioButton radioLanguageGerman;
+    private android.widget.RadioButton radioLanguageEnglish;
     private AlertDialog nfcPrompt;
     private TextView nfcPromptMessage;
     private String selectedLibraryGuid;
@@ -179,6 +184,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             configureActions();
             configureNavigationUi();
             refreshMaterials(null);
+            if (getIntent().getBooleanExtra(EXTRA_REOPEN_LANGUAGE_PAGE, false)) {
+                getIntent().removeExtra(EXTRA_REOPEN_LANGUAGE_PAGE);
+                showLanguagePage();
+            }
             registerModernBackHandler();
 
             if (nfcAdapter == null) {
@@ -586,6 +595,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         drawerOverlay = findViewById(R.id.drawerOverlay);
         secondaryPage = findViewById(R.id.secondaryPage);
         materialPage = findViewById(R.id.materialPage);
+        languagePage = findViewById(R.id.languagePage);
         licensePage = findViewById(R.id.licensePage);
         textPageScroll = findViewById(R.id.textPageScroll);
         materialList = findViewById(R.id.materialList);
@@ -597,6 +607,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         tabWriteIcon = findViewById(R.id.tabWriteIcon);
         textPageTitle = findViewById(R.id.textPageTitle);
         textPageBody = findViewById(R.id.textPageBody);
+        radioLanguageSystem = findViewById(R.id.radioLanguageSystem);
+        radioLanguageGerman = findViewById(R.id.radioLanguageGerman);
+        radioLanguageEnglish = findViewById(R.id.radioLanguageEnglish);
     }
 
     private void configureWriteDateUi() {
@@ -756,7 +769,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         });
         findViewById(R.id.menuLanguage).setOnClickListener(view -> {
             closeDrawer();
-            showLanguageDialog();
+            showLanguagePage();
         });
         findViewById(R.id.menuInfo).setOnClickListener(view -> {
             closeDrawer();
@@ -767,6 +780,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             showLicensePage();
         });
         findViewById(R.id.buttonPageBack).setOnClickListener(view -> closeSecondaryPage());
+        radioLanguageSystem.setOnClickListener(view -> selectLanguage(LocaleHelper.LANGUAGE_SYSTEM));
+        radioLanguageGerman.setOnClickListener(view -> selectLanguage(LocaleHelper.LANGUAGE_GERMAN));
+        radioLanguageEnglish.setOnClickListener(view -> selectLanguage(LocaleHelper.LANGUAGE_ENGLISH));
         findViewById(R.id.buttonLicenseFull).setOnClickListener(view -> showLicenseDialog());
         configureDrawerAppearance();
         tabRead.setOnClickListener(view -> selectTab(true));
@@ -872,33 +888,37 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         secondaryPage.setVisibility(View.GONE);
     }
 
-    private void showLanguageDialog() {
-        String[] choices = new String[]{
-                getString(R.string.language_system),
-                getString(R.string.language_german),
-                getString(R.string.language_english)
-        };
-        String currentLanguage = LocaleHelper.getLanguage(this);
-        int checkedItem = LocaleHelper.choiceIndex(currentLanguage);
+    private void showLanguagePage() {
+        textPageTitle.setText(R.string.language_title);
+        materialPage.setVisibility(View.GONE);
+        licensePage.setVisibility(View.GONE);
+        textPageScroll.setVisibility(View.GONE);
+        languagePage.setVisibility(View.VISIBLE);
+        updateLanguageSelection();
+        secondaryPage.setVisibility(View.VISIBLE);
+    }
 
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.language_title)
-                .setSingleChoiceItems(choices, checkedItem, (dialog, which) -> {
-                    String selectedLanguage = LocaleHelper.languageForChoice(which);
-                    boolean changed = !selectedLanguage.equals(LocaleHelper.getLanguage(this));
-                    LocaleHelper.setLanguage(this, selectedLanguage);
-                    dialog.dismiss();
-                    if (changed) {
-                        recreate();
-                    }
-                })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+    private void updateLanguageSelection() {
+        int checkedItem = LocaleHelper.choiceIndex(LocaleHelper.getLanguage(this));
+        radioLanguageSystem.setChecked(checkedItem == 0);
+        radioLanguageGerman.setChecked(checkedItem == 1);
+        radioLanguageEnglish.setChecked(checkedItem == 2);
+    }
+
+    private void selectLanguage(String selectedLanguage) {
+        boolean changed = !selectedLanguage.equals(LocaleHelper.getLanguage(this));
+        LocaleHelper.setLanguage(this, selectedLanguage);
+        updateLanguageSelection();
+        if (changed) {
+            getIntent().putExtra(EXTRA_REOPEN_LANGUAGE_PAGE, true);
+            recreate();
+        }
     }
 
     private void showMaterialPage() {
         textPageTitle.setText(R.string.page_materials);
         materialPage.setVisibility(View.VISIBLE);
+        languagePage.setVisibility(View.GONE);
         licensePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.GONE);
         renderMaterialLibrary();
@@ -908,6 +928,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void showInfoPage() {
         textPageTitle.setText(R.string.page_info);
         materialPage.setVisibility(View.GONE);
+        languagePage.setVisibility(View.GONE);
         licensePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.VISIBLE);
         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
@@ -920,6 +941,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void showLicensePage() {
         textPageTitle.setText(R.string.page_license);
         materialPage.setVisibility(View.GONE);
+        languagePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.GONE);
         licensePage.setVisibility(View.VISIBLE);
 

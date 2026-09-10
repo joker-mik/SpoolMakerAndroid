@@ -722,6 +722,55 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/languagePage"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <RadioButton
+                android:id="@+id/radioLanguageSystem"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:buttonTint="@color/primary"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:text="@string/language_system"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <RadioButton
+                android:id="@+id/radioLanguageGerman"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:buttonTint="@color/primary"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:text="@string/language_german"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <RadioButton
+                android:id="@+id/radioLanguageEnglish"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:buttonTint="@color/primary"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:text="@string/language_english"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/materialPage"
             android:layout_width="match_parent"
             android:layout_height="0dp"
