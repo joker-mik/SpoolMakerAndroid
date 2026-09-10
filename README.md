@@ -1,4 +1,4 @@
-# Spool Maker Android 1.2.2
+# Spool Maker Android 1.2.3
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
@@ -9,18 +9,18 @@ Upstream / technische Grundlage:
 https://github.com/DA-Osborne/Spool-Maker
 
 Aktuelles Release:
-https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.2
+https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.3
 
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.2.2
+## Stand 1.2.3
 
-Version 1.2.2 erweitert den gehaerteten 1.2-Stand um eine englische und deutsche
-Benutzeroberflaeche. Die App verwendet standardmaessig die Systemsprache. Ist
-die Systemsprache Deutsch, wird die deutsche Oberflaeche verwendet; bei
-Englisch die englische. Fuer alle anderen Systemsprachen dient Englisch als
-Fallback.
+Version 1.2.3 enthaelt die englische und deutsche Benutzeroberflaeche sowie die
+aktualisierten F-Droid-Metadaten und Screenshots. Die App verwendet
+standardmaessig die Systemsprache. Ist die Systemsprache Deutsch, wird die
+deutsche Oberflaeche verwendet; bei Englisch die englische. Fuer alle anderen
+Systemsprachen dient Englisch als Fallback.
 
 Die Sprache kann jederzeit ueber das Seitenmenue geaendert werden. Die
 Sprachauswahl ist wie Materialbibliothek, Info und Lizenz als eigene Seite mit
@@ -33,6 +33,8 @@ Enthalten sind unter anderem:
   englischem Fallback fuer nicht unterstuetzte Systemsprachen.
 - Vollbild-Sprachauswahl mit Zurueck-Pfeil und sofortiger Umschaltung der
   Oberflaechensprache.
+- Aktualisierte F-Droid-Store-Beschreibungen und Screenshot-Galerien fuer
+  Deutsch und Englisch.
 - NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
 - Explizite Tag-Erkennung per `GET_VERSION`; zugelassen werden NTAG215 und
   NTAG216.
@@ -66,7 +68,7 @@ Enthalten sind unter anderem:
   vollstaendigen GPL-Text.
 
 Das NFC-Tag-Format und die Materialverarbeitung wurden durch die
-Sprachunterstuetzung nicht veraendert.
+Sprachunterstuetzung und die Store-Metadaten-Aktualisierung nicht veraendert.
 
 ## Projekt oeffnen
 
@@ -99,8 +101,8 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.2.2
-versionCode:   31
+versionName:   1.2.3
+versionCode:   32
 ```
 
 Der `versionCode` wird ueber Releases hinweg fortlaufend erhoeht, damit Android
