@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2
+
+- Added English and German UI localization.
+- Added a language selector to the navigation drawer with System default, Deutsch, and English options.
+- The app now follows the system language by default.
+- Unsupported system languages fall back to English.
+- Updated visible version information to 1.2.2 / versionCode 31.
+
 ## 1.2.0
 
 - Initiale, gehaertete 1.2-Fassung.
