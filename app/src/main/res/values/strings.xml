@@ -27,7 +27,7 @@
     <string name="page_materials">Material library</string>
     <string name="page_info">Info</string>
     <string name="page_license">License &amp; Open Source</string>
-    <string name="version_footer">Version 1.2.2</string>
+    <string name="version_footer">Version 1.2.3</string>
     <string name="version_format">Version %1$s</string>
     <string name="language_title">Language</string>
     <string name="language_system">System default</string>
