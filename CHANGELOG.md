@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.3
+
+- Updated F-Droid store metadata and expanded the German and English app descriptions.
+- Added complete German and English screenshot galleries for F-Droid.
+- Kept the app behavior, NFC tag format, and material handling unchanged from 1.2.2.
+- Updated visible version information to 1.2.3 / versionCode 32.
+
 ## 1.2.2
 
 - Added English and German UI localization.
