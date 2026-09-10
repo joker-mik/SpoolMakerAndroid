@@ -1,0 +1,1 @@
+Updated the F-Droid store metadata with expanded English and German descriptions and complete screenshot galleries. App behavior, NFC tag format, and material handling are unchanged from 1.2.2.
