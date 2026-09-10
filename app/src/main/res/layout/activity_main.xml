@@ -626,6 +626,19 @@
                 android:textSize="18sp" />
 
             <TextView
+                android:id="@+id/menuLanguage"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:drawableStart="@drawable/ic_language"
+                android:drawablePadding="18dp"
+                android:gravity="center_vertical"
+                android:paddingStart="24dp"
+                android:paddingEnd="16dp"
+                android:text="@string/menu_language"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <TextView
                 android:id="@+id/menuInfo"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"

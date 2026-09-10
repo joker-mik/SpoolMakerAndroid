@@ -259,7 +259,8 @@ public final class ReadGalleryLayout extends LinearLayout {
             return;
         }
 
-        clipboard.setPrimaryClip(ClipData.newPlainText("Spool Maker Ergebnis", out.toString()));
+        clipboard.setPrimaryClip(ClipData.newPlainText(
+                getContext().getString(R.string.clipboard_result_label), out.toString()));
         Toast.makeText(getContext(), R.string.copy_result_done, Toast.LENGTH_SHORT).show();
     }
 

@@ -159,6 +159,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private String lastRawDumpText = "";
 
     @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
@@ -177,11 +182,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             registerModernBackHandler();
 
             if (nfcAdapter == null) {
-                showUserMessage(StatusKind.WARNING,
-                        "Dieses Android-Gerät besitzt keinen kompatiblen NFC-Adapter.");
+                showUserMessage(StatusKind.WARNING, tr(
+                        "This Android device does not have a compatible NFC adapter.",
+                        "Dieses Android-Gerät besitzt keinen kompatiblen NFC-Adapter."));
             } else if (!nfcAdapter.isEnabled()) {
-                showUserMessage(StatusKind.WARNING,
-                        "NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst.");
+                showUserMessage(StatusKind.WARNING, tr(
+                        "NFC is disabled. Enable NFC before reading or writing a tag.",
+                        "NFC ist deaktiviert. Aktiviere NFC, bevor du einen Tag liest oder schreibst."));
             }
         } catch (RuntimeException startupError) {
             showStartupFailure(startupError);
@@ -294,7 +301,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (detail == null || detail.trim().isEmpty()) {
             detail = startupError.getClass().getSimpleName();
         }
-        message.setText("Spool Maker konnte nicht vollstaendig initialisiert werden.\n\n"
+        message.setText(tr(
+                "Spool Maker could not be initialized completely.\n\n",
+                "Spool Maker konnte nicht vollstaendig initialisiert werden.\n\n")
                 + startupError.getClass().getSimpleName() + ": " + detail);
         setContentView(message);
     }
@@ -353,8 +362,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 postUi(() -> {
                     dismissNfcPrompt();
                     updateNfcActionButtons();
-                    showUserMessage(StatusKind.WARNING,
-                            "Eine andere NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
+                    showUserMessage(StatusKind.WARNING, tr(
+                            "Another NFC operation is still running. Please try again afterwards.",
+                            "Eine andere NFC-Kommunikation läuft noch. Bitte danach erneut versuchen."));
                 });
                 return;
             }
@@ -380,14 +390,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                     dismissNfcPrompt();
                     showDecodedSpool(uid, decoded, memory);
                     showUserMessage(StatusKind.SUCCESS,
-                            model + " wurde erfolgreich gelesen.");
+                            model + tr(" was read successfully.", " wurde erfolgreich gelesen."));
                     vibrateSuccess();
                 });
                 return;
             }
 
             if (writeMaterial == null) {
-                throw new IllegalStateException("Kein Material für den Schreibvorgang ausgewählt.");
+                throw new IllegalStateException(tr(
+                        "No material is selected for writing.",
+                        "Kein Material für den Schreibvorgang ausgewählt."));
             }
 
             byte[] encoded = UltimakerTagCodec.encodeSpool(
@@ -407,30 +419,33 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                     || decoded.getDateMeaning() != writeDateMeaning
                     || (writeDateMeaning != UltimakerTagCodec.DateMeaning.NONE
                     && Math.round(decoded.getTimeFieldDoubleSeconds()) != writeDateEpochSeconds)) {
-                throw new IOException(
-                        "Der Tag wurde vollständig geschrieben, aber die semantische Inhaltsprüfung ist fehlgeschlagen.");
+                throw new IOException(tr(
+                        "The tag was fully written, but semantic content verification failed.",
+                        "Der Tag wurde vollständig geschrieben, aber die semantische Inhaltsprüfung ist fehlgeschlagen."));
             }
 
             String model = writeResult.getTagInfo().getDisplayName();
             postUi(() -> {
                 dismissNfcPrompt();
                 showDecodedSpool(uid, decoded, verification);
-                showUserMessage(StatusKind.SUCCESS,
+                showUserMessage(StatusKind.SUCCESS, tr(
+                        model + " was written and verified byte-for-byte across "
+                                + verification.length + " bytes.",
                         model + " wurde geschrieben und über " + verification.length
-                                + " Byte bytegenau verifiziert.");
+                                + " Byte bytegenau verifiziert."));
                 vibrateSuccess();
             });
         } catch (NtagIo.PartialWriteException exception) {
             String detail = safeExceptionMessage(exception);
             postUi(() -> {
                 dismissNfcPrompt();
-                showUserError("NFC-Schreibfehler", detail);
+                showUserError(tr("NFC write error", "NFC-Schreibfehler"), detail);
             });
         } catch (Exception exception) {
             String detail = safeExceptionMessage(exception);
             postUi(() -> {
                 dismissNfcPrompt();
-                showUserError("NFC-Fehler", detail);
+                showUserError(tr("NFC error", "NFC-Fehler"), detail);
             });
         } finally {
             if (globalIoAcquired) {
@@ -465,13 +480,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
 
         if (uris.isEmpty()) {
-            showUserMessage(StatusKind.WARNING, "Keine Materialdatei ausgewählt.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "No material file selected.", "Keine Materialdatei ausgewählt."));
             return;
         }
 
         showUserMessage(StatusKind.INFO, uris.size() == 1
-                ? "Materialimport läuft …"
-                : "Materialimport läuft (" + uris.size() + " Dateien) …");
+                ? tr("Material import in progress …", "Materialimport läuft …")
+                : tr("Material import in progress (" + uris.size() + " files) …",
+                "Materialimport läuft (" + uris.size() + " Dateien) …"));
         importExecutor.execute(() -> importMaterials(uris));
     }
 
@@ -485,7 +502,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             }
             try (InputStream stream = getContentResolver().openInputStream(uri)) {
                 if (stream == null) {
-                    throw new IOException("Datei konnte nicht geöffnet werden.");
+                    throw new IOException(tr(
+                            "File could not be opened.", "Datei konnte nicht geöffnet werden."));
                 }
                 parsedProfiles.add(curaMaterialParser.parse(stream));
             } catch (IOException | XmlPullParserException | IllegalArgumentException exception) {
@@ -497,7 +515,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             try {
                 materialStore.upsertAll(parsedProfiles);
             } catch (RuntimeException exception) {
-                errors.add("Materialbibliothek konnte nicht gespeichert werden: "
+                errors.add(tr(
+                        "Material library could not be saved: ",
+                        "Materialbibliothek konnte nicht gespeichert werden: ")
                         + safeExceptionMessage(exception));
                 parsedProfiles.clear();
             }
@@ -513,16 +533,22 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             refreshMaterials(lastGuid);
             if (imported > 0 && errorCount == 0) {
                 showUserMessage(StatusKind.SUCCESS, imported == 1
-                        ? "1 Material wurde importiert."
-                        : imported + " Materialien wurden importiert.");
+                        ? tr("1 material was imported.", "1 Material wurde importiert.")
+                        : tr(imported + " materials were imported.",
+                        imported + " Materialien wurden importiert."));
             } else if (imported > 0) {
-                showUserMessage(StatusKind.WARNING,
+                showUserMessage(StatusKind.WARNING, tr(
+                        imported + " material file(s) imported; " + errorCount
+                                + " file(s) could not be processed. First error: " + firstError,
                         imported + " Materialdatei(en) importiert; " + errorCount
                                 + " Datei(en) konnten nicht verarbeitet werden. Erster Fehler: "
-                                + firstError);
+                                + firstError));
             } else {
-                showUserError("Import fehlgeschlagen",
-                        firstError == null ? "Keine Datei konnte importiert werden." : firstError);
+                showUserError(tr("Import failed", "Import fehlgeschlagen"),
+                        firstError == null
+                                ? tr("No file could be imported.",
+                                "Keine Datei konnte importiert werden.")
+                                : firstError);
             }
         });
     }
@@ -575,7 +601,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void configureWriteDateUi() {
         if (!(editRemainingWeightGrams.getParent() instanceof ViewGroup)) {
-            throw new IllegalStateException("Schreibbereich hat keinen geeigneten Container fuer Datumsfelder.");
+            throw new IllegalStateException(tr(
+                    "Write section does not have a suitable container for date fields.",
+                    "Schreibbereich hat keinen geeigneten Container fuer Datumsfelder."));
         }
 
         ViewGroup parent = (ViewGroup) editRemainingWeightGrams.getParent();
@@ -589,7 +617,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         sectionParams.bottomMargin = dp(4);
 
         TextView dateMeaningLabel = new TextView(this);
-        dateMeaningLabel.setText("Filament-Datum");
+        dateMeaningLabel.setText(tr("Filament date", "Filament-Datum"));
         dateMeaningLabel.setTextColor(getColor(R.color.text_primary));
         dateMeaningLabel.setTextSize(16f);
         dateMeaningLabel.setTypeface(null, Typeface.BOLD);
@@ -597,11 +625,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         spinnerWriteDateMeaning = new Spinner(this);
         String[] labels = new String[]{
-                "Geöffnet am",
-                "Herstellungsdatum",
-                "Kaufdatum",
-                "Spule angelegt am",
-                "Kein Datum"
+                tr("Opened on", "Geöffnet am"),
+                tr("Manufacturing date", "Herstellungsdatum"),
+                tr("Purchase date", "Kaufdatum"),
+                tr("Spool created on", "Spule angelegt am"),
+                tr("No date", "Kein Datum")
         };
         ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, labels);
@@ -610,7 +638,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         spinnerWriteDateMeaning.setSelection(0);
 
         TextView dateLabel = new TextView(this);
-        dateLabel.setText("Datum");
+        dateLabel.setText(tr("Date", "Datum"));
         dateLabel.setTextColor(getColor(R.color.text_primary));
         dateLabel.setTextSize(16f);
         dateLabel.setTypeface(null, Typeface.BOLD);
@@ -639,14 +667,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 if (hasDate) {
                     updateDateButton(buttonWriteDate, selectedWriteDate);
                 } else {
-                    buttonWriteDate.setText("Kein Datum");
+                    buttonWriteDate.setText(tr("No date", "Kein Datum"));
                 }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 buttonWriteDate.setEnabled(false);
-                buttonWriteDate.setText("Kein Datum");
+                buttonWriteDate.setText(tr("No date", "Kein Datum"));
             }
         });
 
@@ -708,8 +736,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         buttonWrite.setOnClickListener(view -> confirmAndArmWrite());
         findViewById(R.id.buttonCancel).setOnClickListener(view -> cancelPendingAction(true));
         buttonToggleRaw.setOnClickListener(view -> toggleRawDump());
-        buttonCopyDetails.setOnClickListener(view -> copyToClipboard("Ultimaker-Tagdaten", lastDetailsText));
-        buttonCopyRaw.setOnClickListener(view -> copyToClipboard("Ultimaker-Rohdaten", lastRawDumpText));
+        buttonCopyDetails.setOnClickListener(view -> copyToClipboard(
+                tr("UltiMaker tag data", "Ultimaker-Tagdaten"), lastDetailsText));
+        buttonCopyRaw.setOnClickListener(view -> copyToClipboard(
+                tr("UltiMaker raw data", "Ultimaker-Rohdaten"), lastRawDumpText));
         findViewById(R.id.buttonDetails).setOnClickListener(view -> {
             boolean show = detailsPanel.getVisibility() != View.VISIBLE;
             detailsPanel.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -723,6 +753,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         findViewById(R.id.menuMaterials).setOnClickListener(view -> {
             closeDrawer();
             showMaterialPage();
+        });
+        findViewById(R.id.menuLanguage).setOnClickListener(view -> {
+            closeDrawer();
+            showLanguageDialog();
         });
         findViewById(R.id.menuInfo).setOnClickListener(view -> {
             closeDrawer();
@@ -744,13 +778,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         View materialsEntry = findViewById(R.id.menuMaterials);
         if (materialsEntry instanceof TextView) {
             TextView materialsText = (TextView) materialsEntry;
-            materialsText.setText("Materialbibliothek");
+            materialsText.setText(R.string.page_materials);
             materialsText.setCompoundDrawablesRelativeWithIntrinsicBounds(
                     R.drawable.ic_database, 0, 0, 0);
         } else {
             TextView materialsText = findFirstTextView(materialsEntry);
             if (materialsText != null) {
-                materialsText.setText("Materialbibliothek");
+                materialsText.setText(R.string.page_materials);
             }
             ImageView materialsIcon = findFirstImageView(materialsEntry);
             if (materialsIcon != null) {
@@ -760,7 +794,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         TextView version = findViewById(R.id.textDrawerVersion);
         if (version != null) {
-            version.setText("Version " + BuildConfig.VERSION_NAME);
+            version.setText(getString(R.string.version_format, BuildConfig.VERSION_NAME));
             version.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
             version.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
             android.view.ViewGroup.LayoutParams params = version.getLayoutParams();
@@ -838,6 +872,30 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         secondaryPage.setVisibility(View.GONE);
     }
 
+    private void showLanguageDialog() {
+        String[] choices = new String[]{
+                getString(R.string.language_system),
+                getString(R.string.language_german),
+                getString(R.string.language_english)
+        };
+        String currentLanguage = LocaleHelper.getLanguage(this);
+        int checkedItem = LocaleHelper.choiceIndex(currentLanguage);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.language_title)
+                .setSingleChoiceItems(choices, checkedItem, (dialog, which) -> {
+                    String selectedLanguage = LocaleHelper.languageForChoice(which);
+                    boolean changed = !selectedLanguage.equals(LocaleHelper.getLanguage(this));
+                    LocaleHelper.setLanguage(this, selectedLanguage);
+                    dialog.dismiss();
+                    if (changed) {
+                        recreate();
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
     private void showMaterialPage() {
         textPageTitle.setText(R.string.page_materials);
         materialPage.setVisibility(View.VISIBLE);
@@ -853,17 +911,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         licensePage.setVisibility(View.GONE);
         textPageScroll.setVisibility(View.VISIBLE);
         textPageBody.setTypeface(android.graphics.Typeface.DEFAULT);
-        textPageBody.setText(
-                "Spool Maker Android " + BuildConfig.VERSION_NAME + "\n\n"
-                        + "Mit dieser App können UltiMaker-kompatible NFC-Spulentags gelesen und "
-                        + "beschrieben sowie Materialprofile und Restmengen verwaltet werden.\n\n"
-                        + "Bevor ein Tag geschrieben werden kann, muss das gewünschte Material zunächst "
-                        + "über eine Cura-Materialdatei importiert werden. Die App übernimmt daraus "
-                        + "Materialname, Farbe, GUID und – sofern vorhanden – das Spulengewicht. Danach "
-                        + "steht das Material in der Materialbibliothek zur Auswahl.\n\n"
-                        + "Projekt / Quellcode\n"
-                        + "https://github.com/joker-mik/SpoolMakerAndroid\n\n"
-                        + "Kein offizielles UltiMaker-Produkt.");
+        textPageBody.setText(getString(R.string.info_body, BuildConfig.VERSION_NAME));
         Linkify.addLinks(textPageBody, Linkify.WEB_URLS);
         textPageBody.setMovementMethod(LinkMovementMethod.getInstance());
         secondaryPage.setVisibility(View.VISIBLE);
@@ -908,8 +956,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             MaterialProfile profile = materials.get(index);
             TextView row = new TextView(this);
             long weight = profile.getSpoolWeightMg();
-            String weightText = weight > 0 ? formatWeightInput(weight) + " g" : "nicht gespeichert";
-            row.setText(profile.getDisplayName() + "\nSpulengewicht: " + weightText);
+            String weightText = weight > 0
+                    ? formatWeightInput(weight) + " g"
+                    : tr("not stored", "nicht gespeichert");
+            row.setText(profile.getDisplayName()
+                    + tr("\nSpool weight: ", "\nSpulengewicht: ") + weightText);
             row.setTextSize(17f);
             row.setTextColor(getColor(R.color.text_primary));
             row.setMinHeight(dp(72));
@@ -952,8 +1003,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         nfcPromptMessage = new TextView(this);
         nfcPromptMessage.setText(write
-                ? "Beschreibbaren NTAG215 oder NTAG216 an die NFC-Antenne halten."
-                : "NTAG215 oder NTAG216 an die NFC-Antenne halten.");
+                ? tr("Hold a writable NTAG215 or NTAG216 near the NFC antenna.",
+                "Beschreibbaren NTAG215 oder NTAG216 an die NFC-Antenne halten.")
+                : tr("Hold an NTAG215 or NTAG216 near the NFC antenna.",
+                "NTAG215 oder NTAG216 an die NFC-Antenne halten."));
         nfcPromptMessage.setTextSize(19f);
         nfcPromptMessage.setTextColor(getColor(R.color.text_primary));
         nfcPromptMessage.setGravity(android.view.Gravity.CENTER);
@@ -961,9 +1014,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         body.addView(nfcPromptMessage);
 
         nfcPrompt = new AlertDialog.Builder(this)
-                .setTitle(write ? "NFC-Tag schreiben" : "NFC-Tag lesen")
+                .setTitle(write
+                        ? tr("Write NFC tag", "NFC-Tag schreiben")
+                        : tr("Read NFC tag", "NFC-Tag lesen"))
                 .setView(body)
-                .setNegativeButton("Abbrechen", (dialog, which) -> cancelPendingAction(false))
+                .setNegativeButton(R.string.action_cancel,
+                        (dialog, which) -> cancelPendingAction(false))
                 .create();
         nfcPrompt.setCanceledOnTouchOutside(false);
         nfcPrompt.setOnCancelListener(dialog -> cancelPendingAction(false));
@@ -974,11 +1030,15 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (nfcPrompt == null || !nfcPrompt.isShowing()) {
             return;
         }
-        nfcPrompt.setTitle(write ? "NFC-Tag wird geschrieben" : "NFC-Tag wird gelesen");
+        nfcPrompt.setTitle(write
+                ? tr("Writing NFC tag", "NFC-Tag wird geschrieben")
+                : tr("Reading NFC tag", "NFC-Tag wird gelesen"));
         if (nfcPromptMessage != null) {
             nfcPromptMessage.setText(write
-                    ? "Tag erkannt. Typ und Schreibschutz werden geprüft, danach wird geschrieben und verifiziert. Tag nicht entfernen."
-                    : "Tag erkannt. Typ und Speicher werden geprüft und gelesen. Tag nicht entfernen.");
+                    ? tr("Tag detected. Type and write protection are checked before writing and verification. Do not remove the tag.",
+                    "Tag erkannt. Typ und Schreibschutz werden geprüft, danach wird geschrieben und verifiziert. Tag nicht entfernen.")
+                    : tr("Tag detected. Type and memory are checked and read. Do not remove the tag.",
+                    "Tag erkannt. Typ und Speicher werden geprüft und gelesen. Tag nicht entfernen."));
         }
         nfcPrompt.setCancelable(false);
         Button negative = nfcPrompt.getButton(AlertDialog.BUTTON_NEGATIVE);
@@ -1044,7 +1104,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         materials = materialStore.getAll();
         materialAdapter.clear();
         if (materials.isEmpty()) {
-            materialAdapter.add("Keine Materialien gespeichert");
+            materialAdapter.add(tr("No materials stored", "Keine Materialien gespeichert"));
         } else {
             for (MaterialProfile profile : materials) {
                 materialAdapter.add(profile.getDisplayName());
@@ -1114,10 +1174,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(existing == null ? "Material hinzuf\u00fcgen" : "Material bearbeiten")
+                .setTitle(existing == null
+                        ? tr("Add material", "Material hinzufügen")
+                        : tr("Edit material", "Material bearbeiten"))
                 .setView(content)
-                .setNegativeButton("Abbrechen", null)
-                .setPositiveButton("Speichern", null)
+                .setNegativeButton(R.string.action_cancel, null)
+                .setPositiveButton(tr("Save", "Speichern"), null)
                 .create();
 
         dialog.setOnShowListener(ignored -> {
@@ -1140,18 +1202,23 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                             materialStore.upsert(profile);
                         }
                         refreshMaterials(profile.getGuid());
-                        showUserMessage(StatusKind.SUCCESS,
-                                "Material gespeichert: " + profile.getDisplayName());
+                        showUserMessage(StatusKind.SUCCESS, tr(
+                                "Material saved: " + profile.getDisplayName(),
+                                "Material gespeichert: " + profile.getDisplayName()));
                         dialog.dismiss();
                     } catch (IllegalArgumentException exception) {
                         String message = exception.getMessage();
-                        if (message != null && message.toLowerCase(Locale.US).contains("gewicht")) {
-                            editSpoolWeight.setError(message);
+                        String lower = message == null ? "" : message.toLowerCase(Locale.US);
+                        if (lower.contains("gewicht") || lower.contains("weight")) {
+                            editSpoolWeight.setError(LocaleHelper.isGerman(this)
+                                    ? message : "Invalid spool weight.");
                         } else {
-                            editGuid.setError(message);
+                            editGuid.setError(LocaleHelper.isGerman(this)
+                                    ? message : "Invalid material data or GUID.");
                         }
                     } catch (RuntimeException exception) {
-                        showUserError("Speichern fehlgeschlagen", safeExceptionMessage(exception));
+                        showUserError(tr("Save failed", "Speichern fehlgeschlagen"),
+                                safeExceptionMessage(exception));
                     }
                 });
         });
@@ -1164,17 +1231,19 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             return;
         }
         new AlertDialog.Builder(this)
-                .setTitle("Material l\u00f6schen?")
+                .setTitle(tr("Delete material?", "Material löschen?"))
                 .setMessage(profile.getDisplayName() + "\n" + profile.getGuid())
-                .setNegativeButton("Abbrechen", null)
-                .setPositiveButton("L\u00f6schen", (dialog, which) -> {
+                .setNegativeButton(R.string.action_cancel, null)
+                .setPositiveButton(tr("Delete", "Löschen"), (dialog, which) -> {
                     try {
                         materialStore.remove(profile.getGuid());
                         refreshMaterials(null);
-                        showUserMessage(StatusKind.SUCCESS,
-                                "Material wurde aus der lokalen Bibliothek gelöscht.");
+                        showUserMessage(StatusKind.SUCCESS, tr(
+                                "Material was removed from the local library.",
+                                "Material wurde aus der lokalen Bibliothek gelöscht."));
                     } catch (RuntimeException exception) {
-                        showUserError("Löschen fehlgeschlagen", safeExceptionMessage(exception));
+                        showUserError(tr("Delete failed", "Löschen fehlgeschlagen"),
+                                safeExceptionMessage(exception));
                     }
                 })
                 .show();
@@ -1197,14 +1266,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
         synchronized (nfcStateLock) {
             if (nfcState != NfcState.IDLE) {
-                showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
+                showUserMessage(StatusKind.WARNING, tr("An NFC action is already running.", "Es läuft bereits eine NFC-Aktion."));
                 return;
             }
             clearPendingWriteDataLocked();
             nfcState = NfcState.WAITING_READ;
         }
         updateNfcActionButtons();
-        setInternalStatus("Lesen ist aktiviert.");
+        setInternalStatus(tr("Read mode is active.", "Lesen ist aktiviert."));
         showNfcPrompt(false);
     }
 
@@ -1214,8 +1283,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
         MaterialProfile profile = getSelectedMaterial();
         if (profile == null) {
-            showUserMessage(StatusKind.WARNING,
-                    "Vor dem Schreiben muss ein Material angelegt oder importiert werden.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "A material must be added or imported before writing.",
+                    "Vor dem Schreiben muss ein Material angelegt oder importiert werden."));
             return;
         }
 
@@ -1230,7 +1300,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         try {
             remainingWeightMg = parseWeightMg(editRemainingWeightGrams.getText().toString(), true);
             if (remainingWeightMg > totalWeightMg) {
-                throw new IllegalArgumentException("Restmaterial darf nicht groesser als die Gesamtmenge sein.");
+                throw new IllegalArgumentException(tr(
+                        "Remaining material must not exceed the total amount.",
+                        "Restmaterial darf nicht groesser als die Gesamtmenge sein."));
             }
         } catch (IllegalArgumentException exception) {
             editRemainingWeightGrams.setError(exception.getMessage());
@@ -1253,27 +1325,32 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         long dateEpochSeconds = meaning == UltimakerTagCodec.DateMeaning.NONE
                 ? 0L : toUtcDateEpochSeconds(selectedWriteDate);
         String dateSummary = meaning == UltimakerTagCodec.DateMeaning.NONE
-                ? "Kein eigenes Datum"
+                ? tr("No custom date", "Kein eigenes Datum")
                 : writeDateMeaningLabel(meaning) + ": "
                 + DateFormat.getDateInstance(DateFormat.MEDIUM).format(selectedWriteDate.getTime());
 
         String message = profile.getDisplayName() + "\n"
                 + profile.getGuid() + "\n\n"
-                + "Gesamtmenge: " + formatWeight(totalWeightMg) + "\n"
-                + "Restmaterial: " + formatWeight(remainingWeightMg) + "\n"
-                + "Filament-Datum: " + dateSummary + "\n\n"
-                + "Der vorhandene Spuleninhalt wird überschrieben. Zugelassen sind NTAG215 und NTAG216. "
-                + "Tag-Typ, Lock-Bits und Passwortschutz werden vor dem ersten Schreibbyte geprüft.";
+                + tr("Total amount: ", "Gesamtmenge: ") + formatWeight(totalWeightMg) + "\n"
+                + tr("Remaining material: ", "Restmaterial: ") + formatWeight(remainingWeightMg) + "\n"
+                + tr("Filament date: ", "Filament-Datum: ") + dateSummary + "\n\n"
+                + tr(
+                "The existing spool content will be overwritten. NTAG215 and NTAG216 are supported. "
+                        + "Tag type, lock bits and password protection are checked before the first byte is written.",
+                "Der vorhandene Spuleninhalt wird überschrieben. Zugelassen sind NTAG215 und NTAG216. "
+                        + "Tag-Typ, Lock-Bits und Passwortschutz werden vor dem ersten Schreibbyte geprüft.");
 
         new AlertDialog.Builder(this)
-                .setTitle("NFC-Tag schreiben?")
+                .setTitle(tr("Write NFC tag?", "NFC-Tag schreiben?"))
                 .setMessage(message)
-                .setNegativeButton("Abbrechen", null)
-                .setPositiveButton("Schreiben aktivieren", (dialog, which) -> {
+                .setNegativeButton(R.string.action_cancel, null)
+                .setPositiveButton(tr("Enable writing", "Schreiben aktivieren"),
+                        (dialog, which) -> {
                     synchronized (nfcStateLock) {
                         if (nfcState != NfcState.IDLE) {
-                            showUserMessage(StatusKind.WARNING,
-                                    "Es läuft bereits eine NFC-Aktion.");
+                            showUserMessage(StatusKind.WARNING, tr(
+                                    "An NFC action is already running.",
+                                    "Es läuft bereits eine NFC-Aktion."));
                             return;
                         }
                         pendingWriteMaterial = profile;
@@ -1284,7 +1361,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                         nfcState = NfcState.WAITING_WRITE;
                     }
                     updateNfcActionButtons();
-                    setInternalStatus("Schreiben ist aktiviert.");
+                    setInternalStatus(tr("Write mode is active.", "Schreiben ist aktiviert."));
                     showNfcPrompt(true);
                 })
                 .show();
@@ -1293,16 +1370,16 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private String writeDateMeaningLabel(UltimakerTagCodec.DateMeaning meaning) {
         switch (meaning) {
             case MANUFACTURED:
-                return "Herstellungsdatum";
+                return tr("Manufacturing date", "Herstellungsdatum");
             case PURCHASED:
-                return "Kaufdatum";
+                return tr("Purchase date", "Kaufdatum");
             case OPENED:
-                return "Geöffnet am";
+                return tr("Opened on", "Geöffnet am");
             case CREATED:
-                return "Spule angelegt am";
+                return tr("Spool created on", "Spule angelegt am");
             case NONE:
             default:
-                return "Kein Datum";
+                return tr("No date", "Kein Datum");
         }
     }
 
@@ -1321,26 +1398,31 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private boolean ensureNfcReady() {
         if (NFC_IO_ACTIVE.get()) {
-            showUserMessage(StatusKind.WARNING,
-                    "Eine NFC-Kommunikation läuft noch. Bitte danach erneut versuchen.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "An NFC operation is still running. Please try again afterwards.",
+                    "Eine NFC-Kommunikation läuft noch. Bitte danach erneut versuchen."));
             return false;
         }
         if (isNfcProcessing() || isNfcWaiting()) {
-            showUserMessage(StatusKind.WARNING, "Es läuft bereits eine NFC-Aktion.");
+            showUserMessage(StatusKind.WARNING, tr("An NFC action is already running.", "Es läuft bereits eine NFC-Aktion."));
             return false;
         }
         if (nfcAdapter == null) {
-            showUserMessage(StatusKind.WARNING,
-                    "Dieses Gerät besitzt keinen kompatiblen NFC-Adapter.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "This device does not have a compatible NFC adapter.",
+                    "Dieses Gerät besitzt keinen kompatiblen NFC-Adapter."));
             return false;
         }
         if (!nfcAdapter.isEnabled()) {
-            setInternalStatus("NFC ist deaktiviert.");
+            setInternalStatus(tr("NFC is disabled.", "NFC ist deaktiviert."));
             new AlertDialog.Builder(this)
-                    .setTitle("NFC aktivieren")
-                    .setMessage("Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zurück.")
-                    .setNegativeButton("Abbrechen", null)
-                    .setPositiveButton("Einstellungen", (dialog, which) -> openNfcSettings())
+                    .setTitle(tr("Enable NFC", "NFC aktivieren"))
+                    .setMessage(tr(
+                            "Enable NFC in Android settings and then return to the app.",
+                            "Aktiviere NFC in den Android-Einstellungen und kehre danach zur App zurück."))
+                    .setNegativeButton(R.string.action_cancel, null)
+                    .setPositiveButton(tr("Settings", "Einstellungen"),
+                            (dialog, which) -> openNfcSettings())
                     .show();
             return false;
         }
@@ -1371,8 +1453,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         synchronized (nfcStateLock) {
             if (nfcState == NfcState.READING || nfcState == NfcState.WRITING) {
                 if (updateStatus) {
-                    showUserMessage(StatusKind.WARNING,
-                            "Die laufende NFC-Kommunikation kann nicht sicher abgebrochen werden.");
+                    showUserMessage(StatusKind.WARNING, tr(
+                            "The active NFC operation cannot be cancelled safely.",
+                            "Die laufende NFC-Kommunikation kann nicht sicher abgebrochen werden."));
                 }
                 return;
             }
@@ -1382,7 +1465,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         dismissNfcPrompt();
         updateNfcActionButtons();
         if (updateStatus) {
-            showUserMessage(StatusKind.INFO, "NFC-Aktion wurde abgebrochen.");
+            showUserMessage(StatusKind.INFO, tr(
+                    "NFC action was cancelled.", "NFC-Aktion wurde abgebrochen."));
         }
     }
 
@@ -1416,7 +1500,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private long parseWeightMg(String raw, boolean allowZero) {
         if (raw == null || raw.trim().isEmpty()) {
-            throw new IllegalArgumentException("Bitte ein Gewicht in Gramm eingeben.");
+            throw new IllegalArgumentException(tr(
+                    "Enter a weight in grams.", "Bitte ein Gewicht in Gramm eingeben."));
         }
         try {
             BigDecimal grams = new BigDecimal(raw.trim().replace(',', '.'));
@@ -1424,11 +1509,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                     .setScale(0, RoundingMode.HALF_UP);
             long value = milligrams.longValueExact();
             if (value < 0 || (!allowZero && value == 0) || value > UltimakerTagCodec.MAX_UNSIGNED_INT) {
-                throw new IllegalArgumentException("Gewicht liegt ausserhalb des Tagformats.");
+                throw new IllegalArgumentException(tr(
+                        "Weight is outside the tag format range.",
+                        "Gewicht liegt ausserhalb des Tagformats."));
             }
             return value;
         } catch (NumberFormatException | ArithmeticException exception) {
-            throw new IllegalArgumentException("Ungueltiges Gewicht.", exception);
+            throw new IllegalArgumentException(tr(
+                    "Invalid weight.", "Ungueltiges Gewicht."), exception);
         }
     }
 
@@ -1440,10 +1528,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private String formatWeightInput(long milligrams) {
-        return BigDecimal.valueOf(milligrams, 3)
+        return localizeDecimal(BigDecimal.valueOf(milligrams, 3)
                 .stripTrailingZeros()
-                .toPlainString()
-                .replace('.', ',');
+                .toPlainString());
     }
 
     private void showDecodedSpool(String uid, UltimakerTagCodec.DecodedSpool decoded,
@@ -1451,22 +1538,26 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         textScanEmpty.setVisibility(View.GONE);
         MaterialProfile known = materialStore.findByGuid(decoded.getMaterialGuid());
         String materialName = known == null
-                ? "Nicht in der lokalen Bibliothek (Name/Farbe sind nicht auf dem Tag gespeichert)"
-                : known.getDisplayName() + " (lokale Zuordnung ueber GUID)";
+                ? tr("Not in the local library (name/color are not stored on the tag)",
+                "Nicht in der lokalen Bibliothek (Name/Farbe sind nicht auf dem Tag gespeichert)")
+                : known.getDisplayName()
+                + tr(" (local match via GUID)", " (lokale Zuordnung ueber GUID)");
 
         textUid.setText(getString(R.string.label_uid) + ": " + uid
                 + (decoded.getSerial().isEmpty() ? "" : " (Materialrecord: " + decoded.getSerial() + ")"));
         textGuid.setText(getString(R.string.label_guid) + ": " + decoded.getMaterialGuid());
         textMaterialResult.setText(getString(R.string.label_material) + ": " + materialName);
 
-        textWeightResult.setText(getString(R.string.label_weight) + ": Gesamt "
-                + formatAmount(decoded.getTotalAmount(), decoded.getUnit()) + ", verbleibend "
+        textWeightResult.setText(getString(R.string.label_weight)
+                + tr(": Total ", ": Gesamt ")
+                + formatAmount(decoded.getTotalAmount(), decoded.getUnit())
+                + tr(", remaining ", ", verbleibend ")
                 + formatAmount(decoded.getRemainingAmount(), decoded.getUnit()));
 
         textTimestamp.setText(getString(R.string.label_timestamp) + ": "
                 + formatMaterialDate(decoded)
                 + formatCustomDateAgeSuffix(decoded)
-                + ", Nutzungsdauer "
+                + tr(", usage duration ", ", Nutzungsdauer ")
                 + formatDuration(decoded.getTotalUsageDurationSecondsUnsigned()));
         textBatch.setText(getString(R.string.label_batch) + ": " + decoded.getBatchCode());
         textStation.setText(getString(R.string.label_station) + ": 0x"
@@ -1476,15 +1567,19 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         boolean uidMatches = UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial());
         boolean expectedLayout = UltimakerTagCodec.hasExpectedNdefLayout(decoded);
         boolean integrityOk = UltimakerTagCodec.isIntegrityValid(uid, decoded);
-        String integrity = "CRC-8 " + (decoded.isStatusCrcValid() ? "gueltig" : "UNGUELTIG")
-                + ", aktiv Status " + decoded.getActiveStatusRecordIndex()
-                + ", UID/Serial " + (uidMatches ? "OK" : "ABWEICHEND")
-                + ", Materialrecords " + decoded.getMaterialRecordCount()
-                + ", Signaturrecords " + decoded.getSignatureRecordCount()
-                + ", Statusrecords " + decoded.getStatusRecordCount()
-                + (decoded.isDuplicateStatusMatches() ? " (bytegleich)" : " (unterschiedlich, normal moeglich)")
-                + ", Layout " + (expectedLayout ? "OK" : "ABWEICHEND")
-                + ", Sig-Marker " + (decoded.hasExpectedSigMarker() ? "0x2000" : "fehlt/abweichend");
+        String integrity = "CRC-8 "
+                + (decoded.isStatusCrcValid() ? tr("valid", "gueltig") : tr("INVALID", "UNGUELTIG"))
+                + tr(", active status ", ", aktiv Status ") + decoded.getActiveStatusRecordIndex()
+                + ", UID/Serial " + (uidMatches ? "OK" : tr("MISMATCH", "ABWEICHEND"))
+                + tr(", material records ", ", Materialrecords ") + decoded.getMaterialRecordCount()
+                + tr(", signature records ", ", Signaturrecords ") + decoded.getSignatureRecordCount()
+                + tr(", status records ", ", Statusrecords ") + decoded.getStatusRecordCount()
+                + (decoded.isDuplicateStatusMatches()
+                ? tr(" (byte-identical)", " (bytegleich)")
+                : tr(" (different, normally possible)", " (unterschiedlich, normal moeglich)"))
+                + ", Layout " + (expectedLayout ? "OK" : tr("MISMATCH", "ABWEICHEND"))
+                + tr(", signature marker ", ", Sig-Marker ")
+                + (decoded.hasExpectedSigMarker() ? "0x2000" : tr("missing/mismatch", "fehlt/abweichend"));
         textCrc.setText(getString(R.string.label_crc) + ": " + integrity);
         textCrc.setTextColor(getColor(integrityOk ? R.color.accent_dark : R.color.danger));
 
@@ -1509,108 +1604,108 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private String buildFullDetails(String uid, UltimakerTagCodec.DecodedSpool decoded) {
         StringBuilder out = new StringBuilder(4096);
-        appendHeading(out, "TAG UND NDEF");
+        appendHeading(out, tr("TAG AND NDEF", "TAG UND NDEF"));
         appendValue(out, "Chip-UID", uid);
-        appendValue(out, "Materialrecord-Serienfeld", emptyAsMarker(decoded.getSerial()));
-        appendValue(out, "An Decoder uebergebener Datenbereich", decoded.getReadMemoryLength() + " Byte");
-        appendValue(out, "Datenbereich", "NTAG-Seite 4 bis "
+        appendValue(out, tr("Material record serial field", "Materialrecord-Serienfeld"), emptyAsMarker(decoded.getSerial()));
+        appendValue(out, tr("Data range passed to decoder", "An Decoder uebergebener Datenbereich"), decoded.getReadMemoryLength() + " Byte");
+        appendValue(out, tr("Data range", "Datenbereich"), tr("NTAG page 4 to ", "NTAG-Seite 4 bis ")
                 + (NtagIo.FIRST_USER_PAGE + decoded.getReadMemoryLength() / 4 - 1));
-        appendValue(out, "NDEF-Ablage", decoded.isTlvWrapped()
-                ? "NFC-Forum-Type-2-TLV" : "roher NDEF-Bytestrom ab Seite 4");
-        appendValue(out, "NDEF-Offset", decoded.getNdefOffset() + " Byte ab Benutzerspeicher");
-        appendValue(out, "NDEF-Laenge", decoded.getNdefLength() + " Byte");
+        appendValue(out, tr("NDEF storage", "NDEF-Ablage"), decoded.isTlvWrapped()
+                ? "NFC-Forum-Type-2-TLV" : tr("raw NDEF byte stream from page 4", "roher NDEF-Bytestrom ab Seite 4"));
+        appendValue(out, "NDEF offset", decoded.getNdefOffset() + tr(" bytes from user memory", " Byte ab Benutzerspeicher"));
+        appendValue(out, tr("NDEF length", "NDEF-Laenge"), decoded.getNdefLength() + " Byte");
         appendValue(out, "NDEF-Records", Integer.toString(decoded.getNdefRecords().size()));
-        appendValue(out, "Materialrecords", Integer.toString(decoded.getMaterialRecordCount()));
-        appendValue(out, "Signaturrecords", Integer.toString(decoded.getSignatureRecordCount()));
-        appendValue(out, "Statusrecords", Integer.toString(decoded.getStatusRecordCount()));
+        appendValue(out, tr("Material records", "Materialrecords"), Integer.toString(decoded.getMaterialRecordCount()));
+        appendValue(out, tr("Signature records", "Signaturrecords"), Integer.toString(decoded.getSignatureRecordCount()));
+        appendValue(out, tr("Status records", "Statusrecords"), Integer.toString(decoded.getStatusRecordCount()));
 
-        appendHeading(out, "MATERIALRECORD");
-        appendValue(out, "Formatversion", Integer.toString(decoded.getMaterialVersion()));
-        appendValue(out, "Kompatibilitaetsversion", Integer.toString(decoded.getMaterialCompatibility()));
-        appendValue(out, "Seriennummer (14-Byte-Feld)", emptyAsMarker(decoded.getSerial()));
-        appendValue(out, "Zeitfeld roh (Hex)", decoded.getTimeFieldRawHex());
-        appendValue(out, "Zeitfeld roh (uint64)", decoded.getTimeFieldUnsigned().toString());
-        appendValue(out, "Zeitfeld als BE IEEE-754 double",
+        appendHeading(out, tr("MATERIAL RECORD", "MATERIALRECORD"));
+        appendValue(out, tr("Format version", "Formatversion"), Integer.toString(decoded.getMaterialVersion()));
+        appendValue(out, tr("Compatibility version", "Kompatibilitaetsversion"), Integer.toString(decoded.getMaterialCompatibility()));
+        appendValue(out, tr("Serial number (14-byte field)", "Seriennummer (14-Byte-Feld)"), emptyAsMarker(decoded.getSerial()));
+        appendValue(out, tr("Raw time field (hex)", "Zeitfeld roh (Hex)"), decoded.getTimeFieldRawHex());
+        appendValue(out, tr("Raw time field (uint64)", "Zeitfeld roh (uint64)"), decoded.getTimeFieldUnsigned().toString());
+        appendValue(out, tr("Time field as BE IEEE-754 double", "Zeitfeld als BE IEEE-754 double"),
                 formatDoubleSeconds(decoded.getTimeFieldDoubleSeconds()));
-        appendValue(out, "Zeitfeld interpretiert", formatMaterialDate(decoded));
-        appendValue(out, "SpoolMaker-Tagformat", yesNo(decoded.isSpoolMakerTag()));
-        appendValue(out, "SpoolMaker-Datumsart", decoded.isSpoolMakerTag()
-                ? dateMeaningLabel(decoded.getDateMeaning()) : "Originaltag / nicht gesetzt");
+        appendValue(out, tr("Interpreted time field", "Zeitfeld interpretiert"), formatMaterialDate(decoded));
+        appendValue(out, tr("SpoolMaker tag format", "SpoolMaker-Tagformat"), yesNo(decoded.isSpoolMakerTag()));
+        appendValue(out, tr("SpoolMaker date type", "SpoolMaker-Datumsart"), decoded.isSpoolMakerTag()
+                ? dateMeaningLabel(decoded.getDateMeaning()) : tr("Original tag / not set", "Originaltag / nicht gesetzt"));
         if (decoded.hasSpoolMakerDate()) {
-            appendValue(out, "Alter seit Datum", formatCustomDateAge(decoded));
+            appendValue(out, tr("Age since date", "Alter seit Datum"), formatCustomDateAge(decoded));
         }
         appendValue(out, "Material-GUID", decoded.getMaterialGuid());
-        appendValue(out, "Programmierstations-ID", "0x"
+        appendValue(out, tr("Programming station ID", "Programmierstations-ID"), "0x"
                 + String.format(Locale.US, "%04X", decoded.getStationId())
                 + " (" + decoded.getStationId() + ")");
-        appendValue(out, "Batchcode (64-Byte-Feld)", emptyAsMarker(decoded.getBatchCode()));
+        appendValue(out, tr("Batch code (64-byte field)", "Batchcode (64-Byte-Feld)"), emptyAsMarker(decoded.getBatchCode()));
         appendValue(out, "Trailing/unknown Bytes [106..107]", decoded.getMaterialTrailingHex());
 
-        appendHeading(out, "SIGNATURRECORD");
-        appendValue(out, "Vorhanden", yesNo(decoded.isSignaturePresent()));
+        appendHeading(out, tr("SIGNATURE RECORD", "SIGNATURRECORD"));
+        appendValue(out, tr("Present", "Vorhanden"), yesNo(decoded.isSignaturePresent()));
         appendValue(out, "Payload", emptyAsMarker(decoded.getSignaturePayloadHex()));
-        appendValue(out, "Wert", decoded.getSignatureValue() < 0
-                ? "nicht als 16-Bit-Wert lesbar"
+        appendValue(out, tr("Value", "Wert"), decoded.getSignatureValue() < 0
+                ? tr("not readable as a 16-bit value", "nicht als 16-Bit-Wert lesbar")
                 : "0x" + String.format(Locale.US, "%04X", decoded.getSignatureValue())
                 + " (" + decoded.getSignatureValue() + ")");
-        appendValue(out, "Sig-Marker entspricht 0x2000", yesNo(decoded.hasExpectedSigMarker()));
+        appendValue(out, tr("Signature marker equals 0x2000", "Sig-Marker entspricht 0x2000"), yesNo(decoded.hasExpectedSigMarker()));
 
         for (UltimakerTagCodec.DecodedStatusRecord status : decoded.getStatusRecords()) {
             appendHeading(out, "STATUSRECORD " + status.getIndex()
-                    + (status.getIndex() == decoded.getActiveStatusRecordIndex() ? " (AKTIV)" : ""));
-            appendValue(out, "Formatversion", Integer.toString(status.getVersion()));
-            appendValue(out, "Kompatibilitaetsversion", Integer.toString(status.getCompatibility()));
-            appendValue(out, "Einheit", status.getUnit() + " ("
-                    + UltimakerTagCodec.unitLabel(status.getUnit()) + ")");
-            appendValue(out, "Gesamtmenge roh", Long.toString(status.getTotalAmount()));
-            appendValue(out, "Gesamtmenge formatiert",
+                    + (status.getIndex() == decoded.getActiveStatusRecordIndex() ? tr(" (ACTIVE)", " (AKTIV)") : ""));
+            appendValue(out, tr("Format version", "Formatversion"), Integer.toString(status.getVersion()));
+            appendValue(out, tr("Compatibility version", "Kompatibilitaetsversion"), Integer.toString(status.getCompatibility()));
+            appendValue(out, tr("Unit", "Einheit"), status.getUnit() + " ("
+                    + localizedUnitLabel(status.getUnit()) + ")");
+            appendValue(out, tr("Raw total amount", "Gesamtmenge roh"), Long.toString(status.getTotalAmount()));
+            appendValue(out, tr("Formatted total amount", "Gesamtmenge formatiert"),
                     formatAmount(status.getTotalAmount(), status.getUnit()));
-            appendValue(out, "Verbleibende Menge roh", Long.toString(status.getRemainingAmount()));
-            appendValue(out, "Verbleibende Menge formatiert",
+            appendValue(out, tr("Raw remaining amount", "Verbleibende Menge roh"), Long.toString(status.getRemainingAmount()));
+            appendValue(out, tr("Formatted remaining amount", "Verbleibende Menge formatiert"),
                     formatAmount(status.getRemainingAmount(), status.getUnit()));
-            appendValue(out, "Verbraucht (berechnet)",
+            appendValue(out, tr("Consumed (calculated)", "Verbraucht (berechnet)"),
                     formatAmount(status.getTotalAmount() - status.getRemainingAmount(), status.getUnit()));
-            appendValue(out, "Restanteil (berechnet)",
+            appendValue(out, tr("Remaining share (calculated)", "Restanteil (berechnet)"),
                     formatRemainingPercentage(status.getRemainingAmount(), status.getTotalAmount()));
-            appendValue(out, "Nutzungsdauer roh", status.getTotalUsageDurationSecondsUnsigned() + " s");
-            appendValue(out, "Nutzungsdauer formatiert",
+            appendValue(out, tr("Raw usage duration", "Nutzungsdauer roh"), status.getTotalUsageDurationSecondsUnsigned() + " s");
+            appendValue(out, tr("Formatted usage duration", "Nutzungsdauer formatiert"),
                     formatDuration(status.getTotalUsageDurationSecondsUnsigned()));
-            appendValue(out, "CRC gespeichert", "0x"
+            appendValue(out, tr("Stored CRC", "CRC gespeichert"), "0x"
                     + String.format(Locale.US, "%02X", status.getStoredCrc()));
-            appendValue(out, "CRC berechnet", "0x"
+            appendValue(out, tr("Calculated CRC", "CRC berechnet"), "0x"
                     + String.format(Locale.US, "%02X", status.getCalculatedCrc()));
-            appendValue(out, "CRC gueltig", yesNo(status.isCrcValid()));
+            appendValue(out, tr("CRC valid", "CRC gueltig"), yesNo(status.isCrcValid()));
             appendValue(out, "Payload (20 Byte)", status.getPayloadHex());
         }
 
-        appendHeading(out, "KONSISTENZ");
-        appendValue(out, "Alle Status-CRC gueltig", yesNo(decoded.isStatusCrcValid()));
-        appendValue(out, "Aktiver Statusrecord", Integer.toString(decoded.getActiveStatusRecordIndex()));
-        appendValue(out, "Statusrecords bytegleich (nur Information)", yesNo(decoded.isDuplicateStatusMatches()));
-        appendValue(out, "UID entspricht Serienfeld",
+        appendHeading(out, tr("CONSISTENCY", "KONSISTENZ"));
+        appendValue(out, tr("All status CRCs valid", "Alle Status-CRC gueltig"), yesNo(decoded.isStatusCrcValid()));
+        appendValue(out, tr("Active status record", "Aktiver Statusrecord"), Integer.toString(decoded.getActiveStatusRecordIndex()));
+        appendValue(out, tr("Status records byte-identical (information only)", "Statusrecords bytegleich (nur Information)"), yesNo(decoded.isDuplicateStatusMatches()));
+        appendValue(out, tr("UID matches serial field", "UID entspricht Serienfeld"),
                 yesNo(UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial())));
-        appendValue(out, "Sig-Marker 0x2000 vorhanden", yesNo(decoded.hasExpectedSigMarker()));
-        appendValue(out, "Erwartetes Vier-Record-NDEF-Layout",
+        appendValue(out, tr("Signature marker 0x2000 present", "Sig-Marker 0x2000 vorhanden"), yesNo(decoded.hasExpectedSigMarker()));
+        appendValue(out, tr("Expected four-record NDEF layout", "Erwartetes Vier-Record-NDEF-Layout"),
                 yesNo(UltimakerTagCodec.hasExpectedNdefLayout(decoded)));
-        appendValue(out, "Gesamtintegritaet",
+        appendValue(out, tr("Overall integrity", "Gesamtintegritaet"),
                 yesNo(UltimakerTagCodec.isIntegrityValid(uid, decoded)));
 
-        appendHeading(out, "ALLE NDEF-RECORDS");
+        appendHeading(out, tr("ALL NDEF RECORDS", "ALLE NDEF-RECORDS"));
         for (UltimakerTagCodec.DecodedNdefRecord record : decoded.getNdefRecords()) {
             out.append("Record ").append(record.getIndex()).append('\n');
-            appendValue(out, "  Offset/Laenge", record.getOffset() + " / "
+            appendValue(out, tr("  Offset/length", "  Offset/Laenge"), record.getOffset() + " / "
                     + record.getRecordLength() + " Byte");
-            appendValue(out, "  Headerflags", "0x"
+            appendValue(out, tr("  Header flags", "  Headerflags"), "0x"
                     + String.format(Locale.US, "%02X", record.getFlags())
                     + " [MB=" + bit(record.isMessageBegin())
                     + ", ME=" + bit(record.isMessageEnd())
                     + ", SR=" + bit(record.isShortRecord())
                     + ", IL=" + bit(record.hasId()) + "]");
             appendValue(out, "  TNF", record.getTnf() + " (" + tnfLabel(record.getTnf()) + ")");
-            appendValue(out, "  Typ", emptyAsMarker(record.getType()));
+            appendValue(out, tr("  Type", "  Typ"), emptyAsMarker(record.getType()));
             appendValue(out, "  ID Text", emptyAsMarker(record.getIdText()));
             appendValue(out, "  ID Hex", emptyAsMarker(record.getIdHex()));
-            appendValue(out, "  Payload-Laenge", record.getPayloadLength() + " Byte");
+            appendValue(out, tr("  Payload length", "  Payload-Laenge"), record.getPayloadLength() + " Byte");
             appendValue(out, "  Payload Hex", emptyAsMarker(record.getPayloadHex()));
             out.append('\n');
         }
@@ -1619,8 +1714,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private String buildRawDump(byte[] memory) {
         StringBuilder out = new StringBuilder(memory.length * 5);
-        out.append("Gelesener NFC-Datenbereich\n")
-                .append("Seiten 4 bis ")
+        out.append(tr("Read NFC data range\n", "Gelesener NFC-Datenbereich\n"))
+                .append(tr("Pages 4 to ", "Seiten 4 bis "))
                 .append(NtagIo.FIRST_USER_PAGE + memory.length / 4 - 1)
                 .append(", ").append(memory.length).append(" Byte\n\n");
         for (int offset = 0; offset < memory.length; offset += 4) {
@@ -1659,11 +1754,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private String emptyAsMarker(String value) {
-        return value == null || value.isEmpty() ? "<leer>" : value;
+        return value == null || value.isEmpty() ? tr("<empty>", "<leer>") : value;
     }
 
     private String yesNo(boolean value) {
-        return value ? "ja" : "nein";
+        return value ? tr("yes", "ja") : tr("no", "nein");
     }
 
     private int bit(boolean value) {
@@ -1672,14 +1767,29 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private String tnfLabel(int tnf) {
         switch (tnf) {
-            case 0: return "leer";
+            case 0: return tr("empty", "leer");
             case 1: return "NFC Well Known";
             case 2: return "MIME";
             case 3: return "absolute URI";
             case 4: return "External Type";
-            case 5: return "unbekannt";
+            case 5: return tr("unknown", "unbekannt");
             case 6: return "unchanged";
-            default: return "reserviert";
+            default: return tr("reserved", "reserviert");
+        }
+    }
+
+    private String localizedUnitLabel(int unit) {
+        switch (unit) {
+            case UltimakerTagCodec.UNIT_UNUSED:
+                return tr("unused", "nicht verwendet");
+            case UltimakerTagCodec.UNIT_MILLIMETRES:
+                return "mm";
+            case UltimakerTagCodec.UNIT_MILLIGRAMS:
+                return "mg";
+            case UltimakerTagCodec.UNIT_CUBIC_CENTIMETRES:
+                return "cm3";
+            default:
+                return tr("unknown", "unbekannt");
         }
     }
 
@@ -1693,23 +1803,25 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (unit == UltimakerTagCodec.UNIT_CUBIC_CENTIMETRES) {
             return amount + " cm3";
         }
-        return amount + " (Einheitencode " + unit + ")";
+        return amount + tr(" (unit code ", " (Einheitencode ") + unit + ")";
     }
 
     private String formatRemainingPercentage(long remaining, long total) {
         if (total == 0) {
-            return "nicht berechenbar (Gesamtmenge 0)";
+            return tr("not calculable (total amount 0)",
+                    "nicht berechenbar (Gesamtmenge 0)");
         }
         BigDecimal percent = BigDecimal.valueOf(remaining)
                 .multiply(BigDecimal.valueOf(100L))
                 .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP);
-        return percent.toPlainString().replace('.', ',') + " %";
+        return localizeDecimal(percent.toPlainString()) + " %";
     }
 
     private void toggleRawDump() {
         if (lastRawDumpText.isEmpty()) {
-            showUserMessage(StatusKind.WARNING,
-                    "Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "No raw data available yet. Read a tag first.",
+                    "Noch keine Rohdaten vorhanden. Zuerst einen Tag lesen."));
             return;
         }
         boolean show = textRawDump.getVisibility() != View.VISIBLE;
@@ -1719,26 +1831,28 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void copyToClipboard(String label, String text) {
         if (text == null || text.isEmpty()) {
-            showUserMessage(StatusKind.WARNING,
-                    "Noch keine Daten zum Kopieren vorhanden.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "No data is available to copy yet.",
+                    "Noch keine Daten zum Kopieren vorhanden."));
             return;
         }
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard == null) {
-            showUserMessage(StatusKind.WARNING,
-                    "Zwischenablage ist auf diesem Gerät nicht verfügbar.");
+            showUserMessage(StatusKind.WARNING, tr(
+                    "The clipboard is not available on this device.",
+                    "Zwischenablage ist auf diesem Gerät nicht verfügbar."));
             return;
         }
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text));
-        showUserMessage(StatusKind.SUCCESS,
-                label + " wurden in die Zwischenablage kopiert.");
+        showUserMessage(StatusKind.SUCCESS, tr(
+                label + " copied to the clipboard.",
+                label + " wurden in die Zwischenablage kopiert."));
     }
 
     private String formatWeight(long milligrams) {
-        String grams = BigDecimal.valueOf(milligrams, 3)
+        String grams = localizeDecimal(BigDecimal.valueOf(milligrams, 3)
                 .stripTrailingZeros()
-                .toPlainString()
-                .replace('.', ',');
+                .toPlainString());
         return grams + " g (" + milligrams + " mg)";
     }
 
@@ -1746,22 +1860,28 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         double seconds = decoded.getTimeFieldDoubleSeconds();
         if (decoded.isSpoolMakerTag()) {
             if (!decoded.hasSpoolMakerDate()) {
-                return "SpoolMaker: kein Datum gespeichert";
+                return tr("SpoolMaker: no date stored",
+                        "SpoolMaker: kein Datum gespeichert");
             }
             return dateMeaningLabel(decoded.getDateMeaning()) + ": "
                     + formatEpochSeconds(seconds, true);
         }
-        return "UltiMaker-Zeitfeld: " + formatEpochSeconds(seconds, false)
-                + " (als BE-double/Unix-Sekunden interpretiert)";
+        return tr("UltiMaker time field: ", "UltiMaker-Zeitfeld: ")
+                + formatEpochSeconds(seconds, false)
+                + tr(" (interpreted as BE double / Unix seconds)",
+                " (als BE-double/Unix-Sekunden interpretiert)");
     }
 
     private String formatEpochSeconds(double seconds, boolean dateOnly) {
         if (!Double.isFinite(seconds)) {
-            return "nicht als endliche IEEE-754-Zahl interpretierbar";
+            return tr("not interpretable as a finite IEEE-754 number",
+                    "nicht als endliche IEEE-754-Zahl interpretierbar");
         }
         double millis = seconds * 1000.0d;
         if (!Double.isFinite(millis) || millis > Long.MAX_VALUE || millis < Long.MIN_VALUE) {
-            return formatDoubleSeconds(seconds) + " (ausserhalb des Android-Datumsbereichs)";
+            return formatDoubleSeconds(seconds)
+                    + tr(" (outside the Android date range)",
+                    " (ausserhalb des Android-Datumsbereichs)");
         }
         Date date = new Date(Math.round(millis));
         DateFormat formatter = dateOnly
@@ -1782,14 +1902,14 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private String dateMeaningLabel(UltimakerTagCodec.DateMeaning meaning) {
         if (meaning == null) {
-            return "Unbekanntes Datum";
+            return tr("Unknown date", "Unbekanntes Datum");
         }
         switch (meaning) {
-            case MANUFACTURED: return "Herstellungsdatum";
-            case PURCHASED: return "Kaufdatum";
-            case OPENED: return "Geoeffnet am";
-            case CREATED: return "Spule angelegt am";
-            default: return "Kein eigenes Datum";
+            case MANUFACTURED: return tr("Manufacturing date", "Herstellungsdatum");
+            case PURCHASED: return tr("Purchase date", "Kaufdatum");
+            case OPENED: return tr("Opened on", "Geoeffnet am");
+            case CREATED: return tr("Spool created on", "Spule angelegt am");
+            default: return tr("No custom date", "Kein eigenes Datum");
         }
     }
 
@@ -1797,18 +1917,19 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (!decoded.hasSpoolMakerDate()) {
             return "";
         }
-        return ", Alter seit Datum: " + formatCustomDateAge(decoded);
+        return tr(", age since date: ", ", Alter seit Datum: ")
+                + formatCustomDateAge(decoded);
     }
 
     private String formatCustomDateAge(UltimakerTagCodec.DecodedSpool decoded) {
         double seconds = decoded.getTimeFieldDoubleSeconds();
         if (!Double.isFinite(seconds)) {
-            return "nicht berechenbar";
+            return tr("not calculable", "nicht berechenbar");
         }
         double millisDouble = seconds * 1000.0d;
         if (!Double.isFinite(millisDouble) || millisDouble > Long.MAX_VALUE
                 || millisDouble < Long.MIN_VALUE) {
-            return "nicht berechenbar";
+            return tr("not calculable", "nicht berechenbar");
         }
         Calendar localToday = Calendar.getInstance();
         Calendar utcToday = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
@@ -1818,15 +1939,18 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 localToday.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
         long deltaMillis = utcToday.getTimeInMillis() - Math.round(millisDouble);
         if (deltaMillis < 0) {
-            return "Datum liegt in der Zukunft";
+            return tr("Date is in the future", "Datum liegt in der Zukunft");
         }
         long days = deltaMillis / 86_400_000L;
-        return days + (days == 1 ? " Tag" : " Tage");
+        return days + (days == 1
+                ? tr(" day", " Tag")
+                : tr(" days", " Tage"));
     }
 
     private String formatDuration(BigInteger seconds) {
         if (seconds.bitLength() > 63) {
-            return seconds + " s (zu gross fuer Zeitzerlegung)";
+            return seconds + tr(" s (too large for time decomposition)",
+                    " s (zu gross fuer Zeitzerlegung)");
         }
         long value = seconds.longValue();
         long hours = value / 3600L;
@@ -1834,6 +1958,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         long remainingSeconds = value % 60L;
         return hours + " h " + minutes + " min " + remainingSeconds + " s"
                 + " (" + value + " s)";
+    }
+
+    private String tr(String english, String german) {
+        return LocaleHelper.isGerman(this) ? german : english;
+    }
+
+    private String localizeDecimal(String value) {
+        if (value == null) {
+            return "";
+        }
+        return LocaleHelper.isGerman(this) ? value.replace('.', ',') : value;
     }
 
     private void setInternalStatus(String message) {
@@ -1859,7 +1994,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setMessage(message == null || message.trim().isEmpty()
-                        ? "Unbekannter Fehler." : message)
+                        ? tr("Unknown error.", "Unbekannter Fehler.") : message)
                 .setPositiveButton("OK", null)
                 .show();
     }
@@ -1876,9 +2011,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         return !isFinishing() && !isDestroyed();
     }
 
-    private static String safeExceptionMessage(Throwable exception) {
+    private String safeExceptionMessage(Throwable exception) {
         if (exception == null) {
-            return "Unbekannter Fehler.";
+            return tr("Unknown error.", "Unbekannter Fehler.");
         }
         String message = exception.getMessage();
         if (message == null || message.trim().isEmpty()) {
@@ -1896,17 +2031,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private void showAboutDialog() {
-        String message = "Spool Maker Android " + BuildConfig.VERSION_NAME + "\n\n"
-                + "Liest und schreibt UltiMaker-kompatible NFC-Spulentags und verwaltet "
-                + "Materialprofile und Restmengen. Vor dem Schreiben muss das gewünschte "
-                + "Material über eine Cura-Materialdatei importiert werden.\n\n"
-                + "https://github.com/joker-mik/SpoolMakerAndroid\n\n"
-                + "Kein offizielles UltiMaker-Produkt.";
+        String message = getString(R.string.info_body, BuildConfig.VERSION_NAME);
         new AlertDialog.Builder(this)
                 .setTitle("Info")
                 .setMessage(message)
-                .setNegativeButton("Schließen", null)
-                .setNeutralButton("GPL-3.0 anzeigen", (dialog, which) -> showLicenseDialog())
+                .setNegativeButton(tr("Close", "Schließen"), null)
+                .setNeutralButton(tr("Show GPL-3.0", "GPL-3.0 anzeigen"),
+                        (dialog, which) -> showLicenseDialog())
                 .show();
     }
 
@@ -1915,7 +2046,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         try {
             license = readRawText(R.raw.gpl_3);
         } catch (IOException exception) {
-            license = "Lizenztext konnte nicht geladen werden: " + exception.getMessage();
+            license = tr("License text could not be loaded: ",
+                    "Lizenztext konnte nicht geladen werden: ") + exception.getMessage();
         }
 
         TextView textView = new TextView(this);
@@ -1933,7 +2065,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         new AlertDialog.Builder(this)
                 .setTitle("GNU General Public License v3")
                 .setView(scrollView)
-                .setPositiveButton("Schlie\u00dfen", null)
+                .setPositiveButton(tr("Close", "Schließen"), null)
                 .show();
     }
 
