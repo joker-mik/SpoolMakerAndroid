@@ -16,7 +16,7 @@ final class LocaleHelper {
 
     private static final String PREFS_NAME = "spool_maker_ui";
     private static final String KEY_LANGUAGE = "language";
-    private static final String DEFAULT_LANGUAGE = LANGUAGE_ENGLISH;
+    private static final String DEFAULT_LANGUAGE = LANGUAGE_SYSTEM;
 
     private LocaleHelper() {
     }
@@ -25,7 +25,7 @@ final class LocaleHelper {
         String selection = getLanguage(base);
         Locale locale;
         if (LANGUAGE_SYSTEM.equals(selection)) {
-            locale = primaryLocale(Resources.getSystem().getConfiguration());
+            locale = supportedSystemLocale();
         } else if (LANGUAGE_GERMAN.equals(selection)) {
             locale = Locale.GERMAN;
         } else {
@@ -76,6 +76,15 @@ final class LocaleHelper {
     static boolean isGerman(Context context) {
         return LANGUAGE_GERMAN.equals(primaryLocale(
                 context.getResources().getConfiguration()).getLanguage());
+    }
+
+    private static Locale supportedSystemLocale() {
+        Locale systemLocale = primaryLocale(Resources.getSystem().getConfiguration());
+        String language = systemLocale.getLanguage();
+        if (LANGUAGE_GERMAN.equals(language) || LANGUAGE_ENGLISH.equals(language)) {
+            return systemLocale;
+        }
+        return Locale.ENGLISH;
     }
 
     private static boolean isSupported(String language) {
