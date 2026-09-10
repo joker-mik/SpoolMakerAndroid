@@ -1,0 +1,1 @@
+F-Droid-Store-Metadaten mit ausführlicher deutscher und englischer Beschreibung sowie vollständigen Screenshot-Galerien aktualisiert. App-Verhalten, NFC-Tag-Format und Materialverarbeitung bleiben gegenüber 1.2.2 unverändert.
