@@ -66,3 +66,89 @@ jobs:
           name: SpoolMaker-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  signed-test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Prepare Gradle bootstrap
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Restore release signing key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD secret is missing"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS secret is missing"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD secret is missing"; exit 1; }
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release-key.p12
+
+          cat > /tmp/CreateSigningProperties.java <<'JAVA'
+          import java.io.FileOutputStream;
+          import java.util.Properties;
+
+          public class CreateSigningProperties {
+              public static void main(String[] args) throws Exception {
+                  Properties p = new Properties();
+                  p.setProperty("storeFile", "../release-key.p12");
+                  p.setProperty("storePassword", System.getenv("ANDROID_KEYSTORE_PASSWORD"));
+                  p.setProperty("keyAlias", System.getenv("ANDROID_KEY_ALIAS"));
+                  p.setProperty("keyPassword", System.getenv("ANDROID_KEY_PASSWORD"));
+
+                  try (FileOutputStream out = new FileOutputStream("signing.properties")) {
+                      p.store(out, null);
+                  }
+              }
+          }
+          JAVA
+
+          java /tmp/CreateSigningProperties.java
+
+      - name: Build signed bugfix APK
+        shell: bash
+        run: ./gradlew --no-daemon clean testDebugUnitTest lintRelease assembleRelease
+
+      - name: Prepare signed test APK
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk SpoolMaker-1.2.3-bugfix.apk
+          sha256sum SpoolMaker-1.2.3-bugfix.apk > SpoolMaker-1.2.3-bugfix.apk.sha256
+
+      - name: Upload signed test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpoolMaker-1.2.3-bugfix-signed
+          path: |
+            SpoolMaker-1.2.3-bugfix.apk
+            SpoolMaker-1.2.3-bugfix.apk.sha256
+          if-no-files-found: error
+
