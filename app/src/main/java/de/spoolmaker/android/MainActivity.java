@@ -227,7 +227,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             decorView.setSystemUiVisibility(flags);
         }
 
-        window.setStatusBarColor(getColor(R.color.primary));
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.setStatusBarColor(getColor(R.color.primary));
+        }
         window.setNavigationBarColor(getColor(R.color.screen));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.setStatusBarContrastEnforced(false);
@@ -243,6 +245,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         View drawerPanel = findViewById(R.id.drawerPanel);
         View secondaryHeader = findViewById(R.id.secondaryHeader);
         View secondaryRoot = findViewById(R.id.secondaryPage);
+        View statusBarBackground = findViewById(R.id.statusBarBackground);
 
         final int rootLeft = root.getPaddingLeft();
         final int rootRight = root.getPaddingRight();
@@ -288,6 +291,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 topInset = insets.getSystemWindowInsetTop();
                 right = insets.getSystemWindowInsetRight();
                 bottomInset = insets.getSystemWindowInsetBottom();
+            }
+
+            ViewGroup.LayoutParams statusBarLayoutParams = statusBarBackground.getLayoutParams();
+            if (statusBarLayoutParams.height != topInset) {
+                statusBarLayoutParams.height = topInset;
+                statusBarBackground.setLayoutParams(statusBarLayoutParams);
             }
 
             root.setPadding(rootLeft + left, 0, rootRight + right, 0);
