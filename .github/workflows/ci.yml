@@ -140,15 +140,15 @@ jobs:
       - name: Prepare signed test APK
         shell: bash
         run: |
-          cp app/build/outputs/apk/release/app-release.apk SpoolMaker-1.2.3-bugfix.apk
-          sha256sum SpoolMaker-1.2.3-bugfix.apk > SpoolMaker-1.2.3-bugfix.apk.sha256
+          cp app/build/outputs/apk/release/app-release.apk SpoolMaker-1.2.3-bugfix2.apk
+          sha256sum SpoolMaker-1.2.3-bugfix2.apk > SpoolMaker-1.2.3-bugfix2.apk.sha256
 
       - name: Upload signed test APK
         uses: actions/upload-artifact@v4
         with:
-          name: SpoolMaker-1.2.3-bugfix-signed
+          name: SpoolMaker-1.2.3-bugfix2-signed
           path: |
-            SpoolMaker-1.2.3-bugfix.apk
-            SpoolMaker-1.2.3-bugfix.apk.sha256
+            SpoolMaker-1.2.3-bugfix2.apk
+            SpoolMaker-1.2.3-bugfix2.apk.sha256
           if-no-files-found: error
 
