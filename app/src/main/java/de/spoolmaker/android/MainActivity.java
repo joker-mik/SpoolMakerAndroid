@@ -171,6 +171,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        LocaleHelper.migrateLegacySelectionToFramework(this);
         try {
             setContentView(R.layout.activity_main);
             configureSystemBars();
@@ -936,10 +937,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void selectLanguage(String selectedLanguage) {
         boolean changed = !selectedLanguage.equals(LocaleHelper.getLanguage(this));
+        if (!changed) {
+            updateLanguageSelection();
+            return;
+        }
+
+        // Put the marker on the current Intent before changing the framework
+        // application locale. On Android 13+ LocaleManager recreates the Activity
+        // for us; older Android versions still use the legacy explicit recreate().
+        getIntent().putExtra(EXTRA_REOPEN_LANGUAGE_PAGE, true);
         LocaleHelper.setLanguage(this, selectedLanguage);
-        updateLanguageSelection();
-        if (changed) {
-            getIntent().putExtra(EXTRA_REOPEN_LANGUAGE_PAGE, true);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             recreate();
         }
     }
