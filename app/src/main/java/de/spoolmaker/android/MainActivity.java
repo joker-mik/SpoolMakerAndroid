@@ -172,8 +172,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            configureSystemBars();
             setContentView(R.layout.activity_main);
+            configureSystemBars();
             configureSystemBarInsets();
 
             materialStore = new MaterialStore(this);
@@ -207,6 +207,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void configureSystemBars() {
         Window window = getWindow();
         View decorView = window.getDecorView();
+
+        // Android 15+ forces an edge-to-edge window with a transparent status bar.
+        // Keep the decor background aligned with the app bar as an OEM-safe fallback
+        // during Activity recreation (for example after an app-language change).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            decorView.setBackgroundColor(getColor(R.color.primary));
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false);
@@ -282,8 +289,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 android.graphics.Insets safeInsets = insets.getInsets(
                         WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                android.graphics.Insets stableTopInsets = insets.getInsetsIgnoringVisibility(
+                        WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout());
                 left = safeInsets.left;
-                topInset = safeInsets.top;
+                topInset = stableTopInsets.top;
                 right = safeInsets.right;
                 bottomInset = safeInsets.bottom;
             } else {
@@ -308,7 +317,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             bottom.setPadding(bottomLeft, bottomTop, bottomRight, bottomBottom + bottomInset);
             return insets;
         });
-        root.requestApplyInsets();
+        // During recreate(), some OEMs dispatch system-bar state only after the new
+        // content view is attached. Reapply the bar appearance and request fresh
+        // insets on the next UI turn instead of relying on the initial dispatch.
+        root.post(() -> {
+            configureSystemBars();
+            root.requestApplyInsets();
+        });
     }
 
     private void showStartupFailure(RuntimeException startupError) {
@@ -329,6 +344,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     @Override
     protected void onResume() {
         super.onResume();
+        configureSystemBars();
+        View root = findViewById(R.id.rootInsetHost);
+        if (root != null) {
+            root.post(root::requestApplyInsets);
+        }
         enableReaderMode();
         updateNfcActionButtons();
     }
