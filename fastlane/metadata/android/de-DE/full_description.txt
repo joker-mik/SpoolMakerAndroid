@@ -4,7 +4,7 @@ UltiMaker-Filamentspulen verwenden NFC-Tags (RFID), über die der Drucker Materi
 
 Außerdem kannst du neue UltiMaker-kompatible Spulentags auf beschreibbaren NTAG-Tags erstellen. Die untersuchten Originaltags von UltiMaker sind NTAG216. Spool Maker unterstützt beim Schreiben zusätzlich NTAG215; die benötigten 228 Byte passen auch in deren Benutzerspeicher. NTAG215 wurden vom Projektbetreiber jedoch bisher nicht praktisch mit einem UltiMaker-Drucker getestet.
 
-Materialprofile lassen sich aus Cura-/UltiMaker-`.xml.fdm_material`-Dateien importieren und in einer lokalen Materialbibliothek verwalten. Beim Schreiben legst du Material, Gesamtgewicht und verbleibende Menge fest. Für von Spool Maker geschriebene Tags kann dem Datumsfeld zusätzlich eine Bedeutung zugeordnet werden: hergestellt am, gekauft am, geöffnet am, erstellt am oder kein Datum.
+Materialprofile lassen sich aus Cura-/UltiMaker-<code>.xml.fdm_material</code>-Dateien importieren und in einer lokalen Materialbibliothek verwalten. Beim Schreiben legst du Material, Gesamtgewicht und verbleibende Menge fest. Für von Spool Maker geschriebene Tags kann dem Datumsfeld zusätzlich eine Bedeutung zugeordnet werden: hergestellt am, gekauft am, geöffnet am, erstellt am oder kein Datum.
 
 Beim Lesen zeigt Spool Maker unter anderem UID, Material-GUID, Gesamt- und Restmenge, Datums-/Zeitinformationen, Batch-/Stationsdaten und Integritätsinformationen. Für die technische Kontrolle können außerdem alle dekodierten Werte sowie die Rohdaten des Tags angezeigt und kopiert werden.
 

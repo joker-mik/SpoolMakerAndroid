@@ -4,7 +4,7 @@ UltiMaker filament spools use NFC tags (RFID) so the printer can identify materi
 
 You can also create new UltiMaker-compatible spool tags on writable NTAG media. The original UltiMaker tags examined for this project are NTAG216. Spool Maker also supports writing NTAG215 tags; the 228-byte payload fits in their user memory as well. However, NTAG215 has not yet been tested by the project maintainer with an actual UltiMaker printer.
 
-Material profiles can be imported from Cura/UltiMaker `.xml.fdm_material` files and managed in a local material library. When writing a tag, you can select the material, total spool weight and remaining amount. For tags written by Spool Maker, the date field can also be assigned a meaning: manufactured, purchased, opened, created, or no date.
+Material profiles can be imported from Cura/UltiMaker <code>.xml.fdm_material</code> files and managed in a local material library. When writing a tag, you can select the material, total spool weight and remaining amount. For tags written by Spool Maker, the date field can also be assigned a meaning: manufactured, purchased, opened, created, or no date.
 
 When reading a tag, Spool Maker displays information such as the UID, material GUID, total and remaining amount, date/time information, batch and station data, and integrity information. For technical inspection, all decoded values and the raw tag data can also be viewed and copied.
 
