@@ -23,7 +23,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
-import android.view.WindowInsetsController;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -35,6 +34,12 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.core.view.insets.ColorProtection;
+import androidx.core.view.insets.ProtectionLayout;
 
 import de.spoolmaker.android.model.MaterialProfile;
 import de.spoolmaker.android.nfc.NtagIo;
@@ -55,6 +60,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -175,6 +181,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         try {
             setContentView(R.layout.activity_main);
             configureSystemBars();
+            configureSystemBarProtection();
             configureSystemBarInsets();
 
             materialStore = new MaterialStore(this);
@@ -209,40 +216,32 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         Window window = getWindow();
         View decorView = window.getDecorView();
 
-        // Android 15+ forces an edge-to-edge window with a transparent status bar.
-        // Keep the decor background aligned with the app bar as an OEM-safe fallback
-        // during Activity recreation (for example after an app-language change).
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            decorView.setBackgroundColor(getColor(R.color.primary));
-        }
+        // Use the AndroidX edge-to-edge implementation. This removes the framework
+        // color views and lets ProtectionLayout draw the status-bar background.
+        WindowCompat.enableEdgeToEdge(window);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false);
-            WindowInsetsController controller = window.getInsetsController();
-            if (controller != null) {
-                controller.setSystemBarsAppearance(
-                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
-                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
-            }
-        } else {
-            int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            }
-            decorView.setSystemUiVisibility(flags);
-        }
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(window, decorView);
+        controller.setAppearanceLightStatusBars(false);
+        controller.setAppearanceLightNavigationBars(true);
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            window.setStatusBarColor(getColor(R.color.primary));
-        }
-        window.setNavigationBarColor(getColor(R.color.screen));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.setStatusBarContrastEnforced(false);
             window.setNavigationBarContrastEnforced(false);
         }
+    }
+
+    private void configureSystemBarProtection() {
+        ProtectionLayout protectionLayout = findViewById(R.id.systemBarProtection);
+
+        // Diagnostic build for issue #1: magenta is intentional. If it survives
+        // the language-triggered Activity recreation on Motorola/API 35+, the
+        // AndroidX protection layer is working and the remaining issue is elsewhere.
+        ColorProtection statusBarProtection = new ColorProtection(
+                WindowInsetsCompat.Side.TOP,
+                android.graphics.Color.MAGENTA);
+        protectionLayout.setProtections(
+                Collections.singletonList(statusBarProtection));
     }
 
     private void configureSystemBarInsets() {
@@ -253,7 +252,6 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         View drawerPanel = findViewById(R.id.drawerPanel);
         View secondaryHeader = findViewById(R.id.secondaryHeader);
         View secondaryRoot = findViewById(R.id.secondaryPage);
-        View statusBarBackground = findViewById(R.id.statusBarBackground);
 
         final int rootLeft = root.getPaddingLeft();
         final int rootRight = root.getPaddingRight();
@@ -301,12 +299,6 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 topInset = insets.getSystemWindowInsetTop();
                 right = insets.getSystemWindowInsetRight();
                 bottomInset = insets.getSystemWindowInsetBottom();
-            }
-
-            ViewGroup.LayoutParams statusBarLayoutParams = statusBarBackground.getLayoutParams();
-            if (statusBarLayoutParams.height != topInset) {
-                statusBarLayoutParams.height = topInset;
-                statusBarBackground.setLayoutParams(statusBarLayoutParams);
             }
 
             root.setPadding(rootLeft + left, 0, rootRight + right, 0);
