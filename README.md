@@ -1,120 +1,118 @@
 # Spool Maker Android 1.2.4
 
-Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
-DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
-Projekt implementierte UltiMaker-kompatible NFC-Spulenformat auf NTAG215- und
-NTAG216-Tags.
+Complete Android Studio / Gradle project for an Android port of
+DA-Osborne's **Spool-Maker**. The app reads and writes the UltiMaker-compatible
+NFC spool format implemented by the upstream project on NTAG215 and NTAG216
+tags.
 
-Upstream / technische Grundlage:
+Upstream / technical basis:
 https://github.com/DA-Osborne/Spool-Maker
 
-Aktuelles Release:
+Current release:
 https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.4
 
-Dieses Projekt ist Community-Software und kein offizielles Produkt von
-UltiMaker oder DA-Osborne.
+This project is community software and is not an official product of UltiMaker
+or DA-Osborne.
 
-## Stand 1.2.4
+## Version 1.2.4
 
-Version 1.2.4 bringt die getestete Korrektur fuer die Statusleiste unter
-Android 15+ (einschliesslich Motorola-Geraeten), modernisiert die
-Sprachumschaltung auf Android-App-Sprachen und vereinfacht die Ergebnisansicht
-beim Lesen eines Tags.
+Version 1.2.4 includes the tested status bar fix for Android 15+ (including
+Motorola devices), modernizes language switching to use Android per-app
+languages, and simplifies the result view when reading a tag.
 
-Ab Android 13 verwendet die App die Android-API fuer App-Sprachen
-(`LocaleManager`); auf aelteren Android-Versionen bleibt die kompatible
-Fallback-Implementierung erhalten. Zur Auswahl stehen
-**System default / Systemkonfiguration**, **German / Deutsch** und
-**English / Englisch**. Die Auswahl ist eindeutig, sodass immer nur genau eine
-Sprache aktiv ist.
+On Android 13 and newer, the app uses Android's per-app language API
+(`LocaleManager`). Older Android versions continue to use the compatible
+fallback implementation. Available choices are
+**System default / Systemkonfiguration**, **German / Deutsch**, and
+**English / Englisch**. The selection is exclusive, so exactly one language
+option is active at a time.
 
-Die kompakte Ergebnisansicht zeigt jetzt Hersteller, Material, Farbe,
-Spulen- und Restgewicht, Datum, Nutzungsdauer, Chip-UID und Material-GUID.
-Unbekannte Material-GUIDs werden ausdruecklich als
-**Material-GUID nicht in Datenbank** gekennzeichnet. Originale
-UltiMaker-Tags zeigen ihren interpretierten Datumswert ebenfalls direkt an.
+The compact result view now shows manufacturer, material, color, spool weight,
+remaining weight, date, usage duration, chip UID, and material GUID.
+Unknown material GUIDs are explicitly shown as **Material GUID not in
+database**. Original UltiMaker tags also display their interpreted date value
+directly.
 
-Enthalten sind unter anderem:
+Included features include:
 
-- Englische und deutsche UI-Lokalisierung mit Android-App-Sprachen ab
-  Android 13 und kompatiblem Fallback auf aelteren Versionen.
-- Eindeutige Sprachauswahl mit sofortiger Umschaltung der Oberflaechensprache.
-- Android-15+-Statusleisten-Korrektur mit AndroidX `ProtectionLayout`, getestet
-  auch auf Motorola-Hardware.
-- Kompakte Ergebnisansicht mit Hersteller, Material, Farbe, Gewichten,
-  Restprozent, Datum, Nutzungsdauer, Chip-UID und Material-GUID.
-- Klarer Hinweis **Material-GUID nicht in Datenbank** fuer unbekannte
-  Materialprofile.
-- Datumsanzeige auch fuer originale UltiMaker-Tags.
-- Aktualisierte F-Droid-Store-Beschreibungen und Screenshot-Galerien fuer
-  Deutsch und Englisch.
-- NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
-- Explizite Tag-Erkennung per `GET_VERSION`; zugelassen werden NTAG215 und
-  NTAG216.
-- Vollstaendiges Lesen des erkannten Benutzerspeichers: 504 Byte bei NTAG215,
-  888 Byte bei NTAG216.
-- Vor dem Schreiben werden statische Lock-Bits, dynamische Lock-Bits und
-  Passwortschutz fuer den Zielbereich geprueft.
-- Der Schreibdialog bleibt waehrend Schreiben und Verifikation aktiv und warnt
-  davor, den Tag zu entfernen.
-- Nach dem Schreiben werden zuerst exakt die 228 geschriebenen Byte rueckgelesen
-  und bytegenau sowie semantisch verifiziert.
-- Ein abgebrochener Schreibvorgang meldet ausdruecklich, wenn der Tag bereits
-  teilweise veraendert worden sein kann.
-- Dekodierung und Konsistenzpruefung von Material-, Signatur- und beiden
-  Statusrecords inklusive CRC-8, UID/Serienfeld, Signaturmarker und erwartetem
-  Vier-Record-NDEF-Layout.
-- Cura/UltiMaker-`.xml.fdm_material`-Import im Hintergrund mit Begrenzungen fuer
-  Dateigroesse, Dateianzahl und XML-Komplexitaet sowie Ablehnung von DTD/DOCTYPE.
-- Spulengewicht wird beim Import aus `weight` bzw. kompatiblen Gewichtsfeldern
-  uebernommen und lokal gespeichert.
-- Die Materialbibliothek behaelt beim Speichern eine letzte gueltige JSON-
-  Sicherung und ueberschreibt eine beschaedigte Bibliothek nicht stillschweigend.
-- Migration der separat gespeicherten Gewichte aus den App-Versionen 1.1.9 bis
+- English and German UI localization using Android per-app languages on
+  Android 13+ with a compatible fallback on older versions.
+- Exclusive language selection with immediate UI language switching.
+- Android 15+ status bar fix using AndroidX `ProtectionLayout`, also tested on
+  Motorola hardware.
+- Compact result view with manufacturer, material, color, weights, remaining
+  percentage, date, usage duration, chip UID, and material GUID.
+- Clear **Material GUID not in database** message for unknown material
+  profiles.
+- Date display for original UltiMaker tags.
+- Updated F-Droid store descriptions and screenshot galleries for English and
+  German.
+- NFC reading and writing using Android's NFC-A reader mode.
+- Explicit tag detection via `GET_VERSION`; NTAG215 and NTAG216 are supported.
+- Full reading of the detected user memory: 504 bytes on NTAG215 and 888 bytes
+  on NTAG216.
+- Static lock bits, dynamic lock bits, and password protection for the target
+  area are checked before writing.
+- The write dialog remains active during writing and verification and warns the
+  user not to remove the tag.
+- After writing, exactly the 228 written bytes are read back and verified both
+  byte-for-byte and semantically.
+- If a write operation is interrupted, the app explicitly warns that the tag
+  may already have been partially modified.
+- Decoding and consistency checks for material, signature, and both status
+  records, including CRC-8, UID/serial field, signature marker, and the
+  expected four-record NDEF layout.
+- Background import of Cura/UltiMaker `.xml.fdm_material` files with limits for
+  file size, file count, and XML complexity, plus rejection of DTD/DOCTYPE.
+- Spool weight is imported from `weight` or compatible weight fields and stored
+  locally.
+- The material library keeps the last valid JSON backup when saving and does
+  not silently overwrite a corrupted library.
+- Migration of separately stored weights from app versions 1.1.9 through
   1.1.15 (`spool_maker_material_weights_v1`).
-- Materialbibliothek als mehrzeilige Liste mit Symbolbuttons fuer Hinzufuegen,
-  Bearbeiten und Loeschen.
-- NFC-Bereitschaft und Schreibfortschritt werden sichtbar angezeigt.
-- Materialbibliothek, Sprache, Info und Lizenz sind eigene Seiten mit
-  Zurueck-Navigation.
-- Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und den
-  vollstaendigen GPL-Text.
+- Material library shown as a multi-line list with icon buttons for adding,
+  editing, and deleting entries.
+- Visible NFC readiness and write progress indicators.
+- Material library, language, info, and license are separate pages with back
+  navigation.
+- The license page shows origin, copyright, modification status, source code,
+  and the complete GPL text.
 
-Das NFC-Tag-Format und die Materialverarbeitung wurden durch diese
-UI-, Sprach- und Darstellungsanpassungen nicht veraendert.
+The NFC tag format and material processing were not changed by these UI,
+language, and presentation updates.
 
-## Projekt oeffnen
+## Opening the project
 
-1. ZIP entpacken oder das Repository klonen.
-2. Den Projektordner in Android Studio oeffnen.
-3. Android SDK Platform 36 installieren lassen, falls sie fehlt.
-4. Gradle-Synchronisierung ausfuehren.
-5. Ein echtes Android-Geraet mit NFC verwenden.
+1. Extract the ZIP archive or clone the repository.
+2. Open the project folder in Android Studio.
+3. Install Android SDK Platform 36 if it is not already available.
+4. Run Gradle sync.
+5. Use a real Android device with NFC.
 
-Die Build-Umgebung verwendet JDK 21. Der Java-Quellcode bleibt bewusst auf
-Source-/Target-Kompatibilitaet 17 eingestellt. GitHub CI, GitHub Releases und
-die F-Droid-Buildkonfiguration verwenden JDK 21.
+The build environment uses JDK 21. The Java source code intentionally remains
+configured for source/target compatibility 17. GitHub CI, GitHub Releases, and
+the F-Droid build configuration use JDK 21.
 
-Das Projekt verwendet den mitgelieferten, checksum-geprueften Gradle-Bootstrap.
-Auf einem Rechner mit Internetzugang laedt dieser die in
-`gradle/wrapper/gradle-wrapper.properties` konfigurierte Version.
+The project uses the included checksum-verified Gradle bootstrap. On a machine
+with internet access, it downloads the version configured in
+`gradle/wrapper/gradle-wrapper.properties`.
 
-### Debug-APK
+### Debug APK
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-Ausgabe normalerweise unter:
+The output is normally located at:
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Release-APK / Update ueber eine vorhandene Installation
+### Release APK / updating an existing installation
 
-Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
-`versionCode` und demselben Signaturzertifikat. Dieser Quellstand verwendet:
+Android accepts an update only when it uses the same package name, a higher
+`versionCode`, and the same signing certificate. This source version uses:
 
 ```text
 applicationId: de.spoolmaker.android
@@ -122,23 +120,23 @@ versionName:   1.2.4
 versionCode:   33
 ```
 
-Der `versionCode` wird ueber Releases hinweg fortlaufend erhoeht, damit Android
-vorhandene Installationen als aktualisierbar erkennt.
+The `versionCode` is increased continuously across releases so Android can
+recognize existing installations as upgradeable.
 
-Der private Update-Schluessel ist **nicht** im Repository enthalten. Fuer einen
-signierten Release-Build `signing.properties.example` nach
-`signing.properties` kopieren, Pfad und Kennwoerter eintragen und danach:
+The private update key is **not** included in the repository. To create a
+signed release build, copy `signing.properties.example` to
+`signing.properties`, enter the path and passwords, and then run:
 
 ```bash
 ./gradlew assembleRelease
 ```
 
-Das offizielle GitHub-Release wird ueber GitHub Actions mit dem dort hinterlegten
-Release-Schluessel signiert.
+The official GitHub release is signed through GitHub Actions using the release
+key stored there.
 
-## Codec-Selbsttest ohne Android SDK
+## Codec self-test without Android SDK
 
-Der reine NFC-Codec hat keine Android-Abhaengigkeit:
+The NFC codec itself has no Android dependency:
 
 ```bash
 mkdir -p out
@@ -148,10 +146,10 @@ javac -d out \
 java -cp out CodecSelfTest
 ```
 
-Der Selbsttest prueft sowohl NTAG215- als auch NTAG216-grosse Speicherabbilder,
-Record-Layout, CRC und Signaturmarker.
+The self-test covers both NTAG215- and NTAG216-sized memory images, record
+layout, CRC, and signature markers.
 
-## Ordnerstruktur
+## Project structure
 
 ```text
 app/src/main/java/de/spoolmaker/android/
@@ -166,55 +164,53 @@ app/src/main/java/de/spoolmaker/android/
 app/src/main/res/
   layout/
   drawable/
-  values/       # englische Standard-Ressourcen
-  values-de/    # deutsche Ressourcen
+  values/       # English default resources
+  values-de/    # German resources
   raw/gpl_3.txt
 ```
 
-## Hinweise zum Tag-Schreiben
+## Notes on writing tags
 
-Zum ersten Test einen entbehrlichen, wiederbeschreibbaren NTAG215 oder NTAG216
-verwenden. Die Implementierung unterstuetzt beide Tag-Groessen; der
-Standalone-Selbsttest deckt beide Speicherabbild-Groessen ab. NTAG215 wurde vom
-Projektbetreiber bisher nicht auf echter Hardware getestet.
+For initial testing, use a disposable, rewritable NTAG215 or NTAG216. The
+implementation supports both tag sizes, and the standalone self-test covers
+both memory-image sizes. NTAG215 has not yet been tested on real hardware by
+the project maintainer.
 
-Die App schreibt 228 Byte ab NFC-Seite 4. Hersteller-, Lock-, Passwort- und
-Konfigurationsseiten werden nur gelesen, nicht beschrieben.
+The app writes 228 bytes starting at NFC page 4. Manufacturer, lock, password,
+and configuration pages are read only and are not modified.
 
-Mehrseitige NFC-EEPROM-Schreibvorgaenge sind nicht atomar. Wird ein Tag waehrend
-des Schreibens aus dem Feld entfernt, kann er teilweise veraendert sein. Die App
-haelt den Schreibdialog deshalb bis zum Ende der Ruecklesepruefung offen und
-weist im Fehlerfall auf diesen Zustand hin.
+Multi-page NFC EEPROM write operations are not atomic. If a tag is removed from
+the field during writing, it may be left partially modified. The app therefore
+keeps the write dialog open until read-back verification has completed and
+warns about this state if an error occurs.
 
-## Datenschutz und Berechtigungen
+## Privacy and permissions
 
-Die App arbeitet lokal auf dem Geraet. Sie enthaelt keine Internet-Berechtigung,
-keine Tracker, Analytics, Telemetrie, Werbung oder Benutzerkonten. Fuer die
-Kernfunktion werden NFC sowie die im Manifest deklarierten, nicht gefaehrlichen
-Systemfunktionen verwendet; gefaehrliche Android-Laufzeitberechtigungen werden
-nicht angefordert.
+The app works locally on the device. It has no internet permission, trackers,
+analytics, telemetry, advertising, or user accounts. The core functionality
+uses NFC and the non-dangerous system features declared in the manifest;
+dangerous Android runtime permissions are not requested.
 
-## Lizenz
+## License
 
-GPL-3.0-or-later. Siehe `LICENSE` und `NOTICE.md`.
+GPL-3.0-or-later. See `LICENSE` and `NOTICE.md`.
 
-## GitHub Actions und F-Droid
+## GitHub Actions and F-Droid
 
-Dieses Repository enthaelt Workflows unter `.github/workflows/`:
+This repository contains workflows under `.github/workflows/`:
 
-- `ci.yml` fuehrt mit JDK 21 Standalone-Codec-Test, Android-Unit-Tests, Lint
-  und Debug-Build aus.
-- `release.yml` verwendet JDK 21, reagiert auf Versions-Tags (`v*`), prueft,
-  dass der Tag zur `versionName` passt, und baut danach eine signierte
-  Release-APK.
+- `ci.yml` uses JDK 21 and runs the standalone codec self-test, Android unit
+  tests, lint, and a debug build.
+- `release.yml` uses JDK 21, reacts to version tags (`v*`), verifies that the
+  tag matches `versionName`, and then builds a signed release APK.
 
-Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
-und gehoeren niemals ins Repository.
+Signing keys are provided exclusively through GitHub Secrets and are never
+stored in the repository.
 
-F-Droid-Store-Metadaten liegen unter `fastlane/metadata/android/`. Die
-`fdroiddata`-Vorlage liegt unter
-`fdroid/de.spoolmaker.android.yml.template` und ist fuer Version 1.2.4 /
-versionCode 33 sowie JDK 21 vorbereitet.
+F-Droid store metadata is located under `fastlane/metadata/android/`. The
+`fdroiddata` template is located at
+`fdroid/de.spoolmaker.android.yml.template` and is prepared for version 1.2.4,
+versionCode 33, and JDK 21.
 
-Der aktuelle F-Droid-Merge-Request:
+Current F-Droid merge request:
 https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47798
