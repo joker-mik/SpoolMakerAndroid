@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/issue-1-statusbar-after-language-change]
   pull_request:
   workflow_dispatch:
 
@@ -68,7 +68,7 @@ jobs:
           if-no-files-found: error
 
   signed-test:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/fix/issue-1-statusbar-after-language-change'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
