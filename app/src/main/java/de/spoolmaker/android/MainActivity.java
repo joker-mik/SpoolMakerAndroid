@@ -1594,9 +1594,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         textScanEmpty.setVisibility(View.GONE);
         MaterialProfile known = materialStore.findByGuid(decoded.getMaterialGuid());
         String unavailable = getString(R.string.result_not_available);
-        String manufacturer = known == null ? unavailable : summaryValue(known.getBrand(), unavailable);
-        String material = known == null ? unavailable : summaryValue(known.getMaterial(), unavailable);
-        String color = known == null ? unavailable : summaryValue(known.getColor(), unavailable);
+        String unknownGuid = getString(R.string.result_guid_not_in_database);
+        String manufacturer = known == null ? unknownGuid : summaryValue(known.getBrand(), unavailable);
+        String material = known == null ? unknownGuid : summaryValue(known.getMaterial(), unavailable);
+        String color = known == null ? unknownGuid : summaryValue(known.getColor(), unavailable);
 
         textUid.setText(getString(R.string.result_manufacturer) + ": " + manufacturer);
         textGuid.setText(getString(R.string.result_material) + ": " + material);

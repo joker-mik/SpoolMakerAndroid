@@ -79,6 +79,7 @@
     <string name="result_elapsed">Vergangen</string>
     <string name="result_date">Datum</string>
     <string name="result_not_available">Nicht verfügbar</string>
+    <string name="result_guid_not_in_database">Material-GUID nicht in Datenbank</string>
     <string name="result_chip_uid">Chip-UID</string>
     <string name="result_material_guid">Material-GUID</string>
     <string name="read_page_details">Alle Werte</string>
