@@ -232,7 +232,8 @@ public final class ReadGalleryLayout extends LinearLayout {
                 R.id.textTimestamp,
                 R.id.textBatch,
                 R.id.textStation,
-                R.id.textCrc
+                R.id.textChipUid,
+                R.id.textMaterialGuidSummary
         };
 
         StringBuilder out = new StringBuilder(512);
