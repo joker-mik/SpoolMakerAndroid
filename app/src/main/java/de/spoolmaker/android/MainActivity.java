@@ -1739,7 +1739,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             appendValue(out, tr("  Type", "  Typ"), emptyAsMarker(record.getType()));
             appendValue(out, "  ID Text", emptyAsMarker(record.getIdText()));
             appendValue(out, "  ID Hex", emptyAsMarker(record.getIdHex()));
-            appendValue(out, tr("  Payload length", "  Payload-Laenge"), record.getPayloadLength() + " Byte");
+            appendValue(out, tr("  Payload length", "  Payload-Länge"), record.getPayloadLength() + " Byte");
             appendValue(out, "  Payload Hex", emptyAsMarker(record.getPayloadHex()));
             out.append('\n');
         }
@@ -2052,7 +2052,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private String formatDuration(BigInteger seconds) {
         if (seconds.bitLength() > 63) {
             return seconds + tr(" s (too large for time decomposition)",
-                    " s (zu gross für Zeitzerlegung)");
+                    " s (zu groß für Zeitzerlegung)");
         }
         long value = seconds.longValue();
         long hours = value / 3600L;
