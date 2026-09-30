@@ -1,0 +1,1 @@
+Verbesserte Statusleisten-Darstellung unter Android 15+, einschließlich Motorola-Geräten. App-Sprachen nutzen jetzt Android-App-Sprachen, die Sprachauswahl ist eindeutig, die Ergebnisansicht wurde vereinfacht, Original-UltiMaker-Datumswerte werden angezeigt und deutsche Texte wurden bereinigt.

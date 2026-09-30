@@ -70,6 +70,17 @@
     <string name="content_import_database">Import material files into the database</string>
     <string name="materials_empty">The material database is empty.\nAdd a material using + or import material files using the import icon.</string>
     <string name="read_page_result">Result</string>
+    <string name="result_manufacturer">Manufacturer</string>
+    <string name="result_material">Material</string>
+    <string name="result_color">Color</string>
+    <string name="result_spool_weight">Spool weight</string>
+    <string name="result_remaining_weight">Remaining weight</string>
+    <string name="result_usage_duration">Usage duration</string>
+    <string name="result_elapsed">Elapsed</string>
+    <string name="result_date">Date</string>
+    <string name="result_not_available">Not available</string>
+    <string name="result_chip_uid">Chip UID</string>
+    <string name="result_material_guid">Material GUID</string>
     <string name="read_page_details">All values</string>
     <string name="read_page_raw">Raw data</string>
     <string name="button_copy_page">Copy</string>

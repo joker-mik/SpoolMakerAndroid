@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/rootInsetHost"
+<androidx.core.view.insets.ProtectionLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/systemBarProtection"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/screen"
-    android:clipChildren="true"
-    android:clipToPadding="true">
+    android:background="@color/screen">
+
+    <FrameLayout
+        android:id="@+id/rootInsetHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/screen"
+        android:clipChildren="true"
+        android:clipToPadding="true">
 
     <LinearLayout
         android:id="@+id/mainScaffold"
@@ -234,11 +240,20 @@
                                 android:textColor="@color/text_primary" />
 
                             <TextView
-                                android:id="@+id/textCrc"
+                                android:id="@+id/textChipUid"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="14dp"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
+
+                            <TextView
+                                android:id="@+id/textMaterialGuidSummary"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="7dp"
-                                android:textColor="@color/text_primary" />
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
                         </LinearLayout>
                     </ScrollView>
 
@@ -721,7 +736,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <LinearLayout
+        <RadioGroup
             android:id="@+id/languagePage"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -768,7 +783,7 @@
                 android:text="@string/language_english"
                 android:textColor="@color/text_primary"
                 android:textSize="18sp" />
-        </LinearLayout>
+        </RadioGroup>
 
         <LinearLayout
             android:id="@+id/materialPage"
@@ -861,4 +876,6 @@
                 android:textSize="16sp" />
         </ScrollView>
     </LinearLayout>
-</FrameLayout>
+
+    </FrameLayout>
+</androidx.core.view.insets.ProtectionLayout>

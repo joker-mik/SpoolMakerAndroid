@@ -91,7 +91,7 @@ public final class UltimakerTagCodec {
                                      DateMeaning dateMeaning, long dateEpochSeconds) {
         if (totalWeightMg <= 0 || totalWeightMg > MAX_UNSIGNED_INT) {
             throw new IllegalArgumentException(
-                    "Gesamtgewicht liegt ausserhalb des 32-Bit-Tagformats.");
+                    "Gesamtgewicht liegt außerhalb des 32-Bit-Tagformats.");
         }
         if (remainingWeightMg < 0 || remainingWeightMg > totalWeightMg
                 || remainingWeightMg > MAX_UNSIGNED_INT) {
@@ -278,7 +278,7 @@ public final class UltimakerTagCodec {
 
     public static int crc8(byte[] data, int offset, int length) {
         if (data == null || offset < 0 || length < 0 || offset + length > data.length) {
-            throw new IllegalArgumentException("Ungueltiger CRC-Bereich.");
+            throw new IllegalArgumentException("Ungültiger CRC-Bereich.");
         }
         int crc = 0;
         for (int index = offset; index < offset + length; index++) {
@@ -442,7 +442,7 @@ public final class UltimakerTagCodec {
             cursor++;
         }
         if (cursor >= memory.length) {
-            throw new IllegalArgumentException("Der Tag enthaelt keine NDEF-Daten.");
+            throw new IllegalArgumentException("Der Tag enthält keine NDEF-Daten.");
         }
 
         int firstType = memory[cursor] & 0xFF;
@@ -466,14 +466,14 @@ public final class UltimakerTagCodec {
             int length = memory[cursor++] & 0xFF;
             if (length == 0xFF) {
                 if (cursor + 1 >= memory.length) {
-                    throw new IllegalArgumentException("Beschaedigte NDEF-TLV-Laenge.");
+                    throw new IllegalArgumentException("Beschädigte NDEF-TLV-Länge.");
                 }
                 length = ((memory[cursor] & 0xFF) << 8)
                         | (memory[cursor + 1] & 0xFF);
                 cursor += 2;
             }
             if (cursor + length > memory.length) {
-                throw new IllegalArgumentException("NDEF-TLV ist unvollstaendig.");
+                throw new IllegalArgumentException("NDEF-TLV ist unvollständig.");
             }
             if (type == 0x03) {
                 return new ExtractedMessage(
@@ -498,7 +498,7 @@ public final class UltimakerTagCodec {
             boolean chunked = (flags & FLAG_CF) != 0;
             if (chunked) {
                 throw new IllegalArgumentException(
-                        "Chunked NDEF-Records werden nicht unterstuetzt.");
+                        "Chunked NDEF-Records werden nicht unterstützt.");
             }
 
             int typeLength = readUnsignedByte(message, cursor++);
@@ -512,11 +512,11 @@ public final class UltimakerTagCodec {
             int idLength = hasId ? readUnsignedByte(message, cursor++) : 0;
 
             if (payloadLength > Integer.MAX_VALUE) {
-                throw new IllegalArgumentException("NDEF-Payload ist zu gross.");
+                throw new IllegalArgumentException("NDEF-Payload ist zu groß.");
             }
             int required = typeLength + idLength + (int) payloadLength;
             if (required < 0 || cursor + required > message.length) {
-                throw new IllegalArgumentException("NDEF-Record ist unvollstaendig.");
+                throw new IllegalArgumentException("NDEF-Record ist unvollständig.");
             }
 
             byte[] type = Arrays.copyOfRange(message, cursor, cursor + typeLength);
@@ -539,7 +539,7 @@ public final class UltimakerTagCodec {
 
         if (!foundEnd || records.isEmpty()) {
             throw new IllegalArgumentException(
-                    "NDEF-Nachricht besitzt kein gueltiges Ende.");
+                    "NDEF-Nachricht besitzt kein gültiges Ende.");
         }
         return new ParsedRecords(records, cursor);
     }

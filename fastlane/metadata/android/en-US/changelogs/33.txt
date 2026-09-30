@@ -1,0 +1,1 @@
+Improved Android 15+ status bar handling, including Motorola devices. Switched app language handling to Android per-app locales, fixed exclusive language selection, simplified the read result page, improved original UltiMaker date display, and cleaned up German translations.
