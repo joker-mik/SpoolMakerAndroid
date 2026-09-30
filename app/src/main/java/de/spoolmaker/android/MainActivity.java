@@ -30,6 +30,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -135,7 +136,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private View drawerOverlay;
     private View secondaryPage;
     private View materialPage;
-    private View languagePage;
+    private RadioGroup languagePage;
     private View licensePage;
     private View textPageScroll;
     private LinearLayout materialList;
@@ -234,12 +235,9 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private void configureSystemBarProtection() {
         ProtectionLayout protectionLayout = findViewById(R.id.systemBarProtection);
 
-        // Diagnostic build for issue #1: magenta is intentional. If it survives
-        // the language-triggered Activity recreation on Motorola/API 35+, the
-        // AndroidX protection layer is working and the remaining issue is elsewhere.
         ColorProtection statusBarProtection = new ColorProtection(
                 WindowInsetsCompat.Side.TOP,
-                android.graphics.Color.MAGENTA);
+                getColor(R.color.primary));
         protectionLayout.setProtections(
                 Collections.singletonList(statusBarProtection));
     }
@@ -922,9 +920,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
     private void updateLanguageSelection() {
         int checkedItem = LocaleHelper.choiceIndex(LocaleHelper.getLanguage(this));
-        radioLanguageSystem.setChecked(checkedItem == 0);
-        radioLanguageGerman.setChecked(checkedItem == 1);
-        radioLanguageEnglish.setChecked(checkedItem == 2);
+        if (checkedItem == 0) {
+            languagePage.check(R.id.radioLanguageSystem);
+        } else if (checkedItem == 1) {
+            languagePage.check(R.id.radioLanguageGerman);
+        } else {
+            languagePage.check(R.id.radioLanguageEnglish);
+        }
     }
 
     private void selectLanguage(String selectedLanguage) {
