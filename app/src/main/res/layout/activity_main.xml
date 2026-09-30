@@ -727,7 +727,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <LinearLayout
+        <RadioGroup
             android:id="@+id/languagePage"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -774,7 +774,7 @@
                 android:text="@string/language_english"
                 android:textColor="@color/text_primary"
                 android:textSize="18sp" />
-        </LinearLayout>
+        </RadioGroup>
 
         <LinearLayout
             android:id="@+id/materialPage"
