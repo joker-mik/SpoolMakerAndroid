@@ -110,13 +110,35 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk SpoolMaker-1.2.4.apk
           sha256sum SpoolMaker-1.2.4.apk > SpoolMaker-1.2.4.apk.sha256
 
+      - name: Upload release build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpoolMaker-1.2.4-release
+          path: |
+            SpoolMaker-1.2.4.apk
+            SpoolMaker-1.2.4.apk.sha256
+          if-no-files-found: error
+
       - name: Publish GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v1.2.4 \
-            SpoolMaker-1.2.4.apk SpoolMaker-1.2.4.apk.sha256 \
-            --verify-tag \
-            --title "Spool Maker v1.2.4" \
-            --generate-notes
+          for attempt in 1 2 3 4 5; do
+            if gh release view v1.2.4 >/dev/null 2>&1; then
+              echo "Release exists; ensuring assets are uploaded."
+              gh release upload v1.2.4 \
+                SpoolMaker-1.2.4.apk SpoolMaker-1.2.4.apk.sha256 \
+                --clobber && exit 0
+            else
+              echo "Creating release (attempt $attempt/5)."
+              gh release create v1.2.4 \
+                SpoolMaker-1.2.4.apk SpoolMaker-1.2.4.apk.sha256 \
+                --verify-tag \
+                --title "Spool Maker v1.2.4" \
+                --generate-notes && exit 0
+            fi
+            sleep 15
+          done
+          echo "Failed to publish v1.2.4 after retries."
+          exit 1
