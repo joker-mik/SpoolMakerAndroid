@@ -59,6 +59,7 @@ import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -1590,51 +1591,30 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                                   byte[] memory) {
         textScanEmpty.setVisibility(View.GONE);
         MaterialProfile known = materialStore.findByGuid(decoded.getMaterialGuid());
-        String materialName = known == null
-                ? tr("Not in the local library (name/color are not stored on the tag)",
-                "Nicht in der lokalen Bibliothek (Name/Farbe sind nicht auf dem Tag gespeichert)")
-                : known.getDisplayName()
-                + tr(" (local match via GUID)", " (lokale Zuordnung ueber GUID)");
+        String unavailable = getString(R.string.result_not_available);
+        String manufacturer = known == null ? unavailable : summaryValue(known.getBrand(), unavailable);
+        String material = known == null ? unavailable : summaryValue(known.getMaterial(), unavailable);
+        String color = known == null ? unavailable : summaryValue(known.getColor(), unavailable);
 
-        textUid.setText(getString(R.string.label_uid) + ": " + uid
-                + (decoded.getSerial().isEmpty() ? "" : " (Materialrecord: " + decoded.getSerial() + ")"));
-        textGuid.setText(getString(R.string.label_guid) + ": " + decoded.getMaterialGuid());
-        textMaterialResult.setText(getString(R.string.label_material) + ": " + materialName);
+        textUid.setText(getString(R.string.result_manufacturer) + ": " + manufacturer);
+        textGuid.setText(getString(R.string.result_material) + ": " + material);
+        textMaterialResult.setText(getString(R.string.result_color) + ": " + color);
+        textWeightResult.setText(getString(R.string.result_spool_weight) + ": "
+                + formatSummaryAmount(decoded.getTotalAmount(), decoded.getUnit()));
 
-        textWeightResult.setText(getString(R.string.label_weight)
-                + tr(": Total ", ": Gesamt ")
-                + formatAmount(decoded.getTotalAmount(), decoded.getUnit())
-                + tr(", remaining ", ", verbleibend ")
-                + formatAmount(decoded.getRemainingAmount(), decoded.getUnit()));
+        String remaining = formatSummaryAmount(decoded.getRemainingAmount(), decoded.getUnit());
+        String percentage = formatSummaryPercentage(
+                decoded.getRemainingAmount(), decoded.getTotalAmount());
+        textTimestamp.setText(getString(R.string.result_remaining_weight) + ": "
+                + remaining + (percentage.isEmpty() ? "" : " (" + percentage + ")"));
 
-        textTimestamp.setText(getString(R.string.label_timestamp) + ": "
-                + formatMaterialDate(decoded)
-                + formatCustomDateAgeSuffix(decoded)
-                + tr(", usage duration ", ", Nutzungsdauer ")
-                + formatDuration(decoded.getTotalUsageDurationSecondsUnsigned()));
-        textBatch.setText(getString(R.string.label_batch) + ": " + decoded.getBatchCode());
-        textStation.setText(getString(R.string.label_station) + ": 0x"
-                + String.format(Locale.US, "%04X", decoded.getStationId())
-                + " (" + decoded.getStationId() + ")");
+        textBatch.setText(formatSummaryDateLine(decoded));
+        textStation.setText(getString(R.string.result_usage_duration) + " "
+                + formatDurationCompact(decoded.getTotalUsageDurationSecondsUnsigned()));
 
-        boolean uidMatches = UltimakerTagCodec.uidMatchesSerial(uid, decoded.getSerial());
-        boolean expectedLayout = UltimakerTagCodec.hasExpectedNdefLayout(decoded);
-        boolean integrityOk = UltimakerTagCodec.isIntegrityValid(uid, decoded);
-        String integrity = "CRC-8 "
-                + (decoded.isStatusCrcValid() ? tr("valid", "gueltig") : tr("INVALID", "UNGUELTIG"))
-                + tr(", active status ", ", aktiv Status ") + decoded.getActiveStatusRecordIndex()
-                + ", UID/Serial " + (uidMatches ? "OK" : tr("MISMATCH", "ABWEICHEND"))
-                + tr(", material records ", ", Materialrecords ") + decoded.getMaterialRecordCount()
-                + tr(", signature records ", ", Signaturrecords ") + decoded.getSignatureRecordCount()
-                + tr(", status records ", ", Statusrecords ") + decoded.getStatusRecordCount()
-                + (decoded.isDuplicateStatusMatches()
-                ? tr(" (byte-identical)", " (bytegleich)")
-                : tr(" (different, normally possible)", " (unterschiedlich, normal moeglich)"))
-                + ", Layout " + (expectedLayout ? "OK" : tr("MISMATCH", "ABWEICHEND"))
-                + tr(", signature marker ", ", Sig-Marker ")
-                + (decoded.hasExpectedSigMarker() ? "0x2000" : tr("missing/mismatch", "fehlt/abweichend"));
-        textCrc.setText(getString(R.string.label_crc) + ": " + integrity);
-        textCrc.setTextColor(getColor(integrityOk ? R.color.accent_dark : R.color.danger));
+        // Technical UID/GUID/batch/station/integrity data remains available on
+        // the "All values" page; keep the compact result page focused.
+        textCrc.setVisibility(View.GONE);
 
         lastDetailsText = buildFullDetails(uid, decoded);
         lastRawDumpText = buildRawDump(memory);
@@ -1870,6 +1850,70 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         return localizeDecimal(percent.toPlainString()) + " %";
     }
 
+    private String summaryValue(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
+    }
+
+    private String formatSummaryAmount(long amount, int unit) {
+        if (unit == UltimakerTagCodec.UNIT_MILLIGRAMS) {
+            String grams = localizeDecimal(BigDecimal.valueOf(amount, 3)
+                    .stripTrailingZeros()
+                    .toPlainString());
+            return grams + "g";
+        }
+        return formatAmount(amount, unit);
+    }
+
+    private String formatSummaryPercentage(long remaining, long total) {
+        if (total <= 0) {
+            return "";
+        }
+        BigDecimal percent = BigDecimal.valueOf(remaining)
+                .multiply(BigDecimal.valueOf(100L))
+                .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP);
+        return localizeDecimal(percent.toPlainString()) + "%";
+    }
+
+    private String formatSummaryDateLine(UltimakerTagCodec.DecodedSpool decoded) {
+        if (!decoded.isSpoolMakerTag() || !decoded.hasSpoolMakerDate()) {
+            return getString(R.string.result_date) + ": "
+                    + getString(R.string.result_not_available);
+        }
+
+        double seconds = decoded.getTimeFieldDoubleSeconds();
+        String date = formatSummaryDate(seconds);
+        String age = formatCustomDateAge(decoded);
+        return dateMeaningLabel(decoded.getDateMeaning()) + ": " + date
+                + " (" + getString(R.string.result_elapsed) + ": " + age + ")";
+    }
+
+    private String formatSummaryDate(double seconds) {
+        if (!Double.isFinite(seconds)) {
+            return getString(R.string.result_not_available);
+        }
+        double millis = seconds * 1000.0d;
+        if (!Double.isFinite(millis) || millis > Long.MAX_VALUE || millis < Long.MIN_VALUE) {
+            return getString(R.string.result_not_available);
+        }
+
+        Locale locale = LocaleHelper.isGerman(this) ? Locale.GERMANY : Locale.US;
+        String pattern = LocaleHelper.isGerman(this) ? "dd.MM.yyyy" : "MMM d, yyyy";
+        SimpleDateFormat formatter = new SimpleDateFormat(pattern, locale);
+        formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return formatter.format(new Date(Math.round(millis)));
+    }
+
+    private String formatDurationCompact(BigInteger seconds) {
+        if (seconds.bitLength() > 63) {
+            return seconds + " s";
+        }
+        long value = seconds.longValue();
+        long hours = value / 3600L;
+        long minutes = (value % 3600L) / 60L;
+        long remainingSeconds = value % 60L;
+        return hours + " h " + minutes + " min " + remainingSeconds + " s";
+    }
+
     private void toggleRawDump() {
         if (lastRawDumpText.isEmpty()) {
             showUserMessage(StatusKind.WARNING, tr(
@@ -1960,7 +2004,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         switch (meaning) {
             case MANUFACTURED: return tr("Manufacturing date", "Herstellungsdatum");
             case PURCHASED: return tr("Purchase date", "Kaufdatum");
-            case OPENED: return tr("Opened on", "Geoeffnet am");
+            case OPENED: return tr("Opened on", "Geöffnet am");
             case CREATED: return tr("Spool created on", "Spule angelegt am");
             default: return tr("No custom date", "Kein eigenes Datum");
         }

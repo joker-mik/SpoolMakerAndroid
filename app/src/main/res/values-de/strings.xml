@@ -70,6 +70,15 @@
     <string name="content_import_database">Materialdateien in die Datenbank importieren</string>
     <string name="materials_empty">Die Materialdatenbank ist leer.\nLege &#252;ber + ein Material an oder importiere Materialdateien &#252;ber das Import-Symbol.</string>
     <string name="read_page_result">Ergebnis</string>
+    <string name="result_manufacturer">Hersteller</string>
+    <string name="result_material">Material</string>
+    <string name="result_color">Farbe</string>
+    <string name="result_spool_weight">Spulengewicht</string>
+    <string name="result_remaining_weight">Restgewicht</string>
+    <string name="result_usage_duration">Nutzungsdauer</string>
+    <string name="result_elapsed">Vergangen</string>
+    <string name="result_date">Datum</string>
+    <string name="result_not_available">Nicht verfügbar</string>
     <string name="read_page_details">Alle Werte</string>
     <string name="read_page_raw">Rohdaten</string>
     <string name="button_copy_page">Kopieren</string>
