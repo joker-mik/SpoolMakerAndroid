@@ -1,4 +1,4 @@
-name: Publish v1.2.4 tag
+name: Publish v1.2.4 release
 
 on:
   push:
@@ -9,23 +9,114 @@ permissions:
   contents: write
 
 jobs:
-  tag:
+  release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout repository
+      - name: Checkout v1.2.4
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          ref: v1.2.4
 
-      - name: Create v1.2.4 tag on final main commit
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 36
         shell: bash
         run: |
-          git fetch origin main --tags
-          test "$(git rev-parse origin/main)" = "c4ba38c24269fc66455fbda48f7d08faf2031ef4" || {
-            echo "main moved; refusing to tag"
-            exit 1
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Prepare Gradle bootstrap
+        shell: bash
+        run: chmod +x ./gradlew
+
+      - name: Verify release version
+        shell: bash
+        run: |
+          APP_VERSION="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle)"
+          APP_CODE="$(sed -n 's/.*versionCode \([0-9][0-9]*\).*/\1/p' app/build.gradle)"
+          test "$APP_VERSION" = "1.2.4"
+          test "$APP_CODE" = "33"
+          test "$(git rev-parse HEAD)" = "c4ba38c24269fc66455fbda48f7d08faf2031ef4"
+
+      - name: Codec standalone self-test
+        shell: bash
+        run: |
+          rm -rf build/selftest
+          mkdir -p build/selftest
+          javac -d build/selftest \
+            app/src/main/java/de/spoolmaker/android/nfc/UltimakerTagCodec.java \
+            tools/CodecSelfTest.java
+          java -cp build/selftest CodecSelfTest
+
+      - name: Restore release signing key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release-key.p12
+
+          keytool -list \
+            -storetype PKCS12 \
+            -keystore release-key.p12 \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            >/dev/null
+
+          cat > /tmp/CreateSigningProperties.java <<'JAVA'
+          import java.io.FileOutputStream;
+          import java.util.Properties;
+
+          public class CreateSigningProperties {
+              public static void main(String[] args) throws Exception {
+                  Properties p = new Properties();
+                  p.setProperty("storeFile", "../release-key.p12");
+                  p.setProperty("storePassword", System.getenv("ANDROID_KEYSTORE_PASSWORD"));
+                  p.setProperty("keyAlias", System.getenv("ANDROID_KEY_ALIAS"));
+                  p.setProperty("keyPassword", System.getenv("ANDROID_KEY_PASSWORD"));
+                  try (FileOutputStream out = new FileOutputStream("signing.properties")) {
+                      p.store(out, null);
+                  }
+              }
           }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a v1.2.4 "c4ba38c24269fc66455fbda48f7d08faf2031ef4" -m "Spool Maker v1.2.4"
-          git push origin v1.2.4
+          JAVA
+
+          java /tmp/CreateSigningProperties.java
+
+      - name: Build signed release APK
+        shell: bash
+        run: ./gradlew --no-daemon clean testDebugUnitTest lintRelease assembleRelease
+
+      - name: Prepare release files
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk SpoolMaker-1.2.4.apk
+          sha256sum SpoolMaker-1.2.4.apk > SpoolMaker-1.2.4.apk.sha256
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.2.4 \
+            SpoolMaker-1.2.4.apk SpoolMaker-1.2.4.apk.sha256 \
+            --verify-tag \
+            --title "Spool Maker v1.2.4" \
+            --generate-notes
