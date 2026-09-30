@@ -11,7 +11,7 @@
     <string name="total_weight_hint">z. B. 750</string>
     <string name="remaining_weight_label">Restmenge (g)</string>
     <string name="remaining_weight_hint">z. B. 750</string>
-    <string name="weight_help">Beim Materialwechsel wird das aus der Materialdatei gespeicherte Spulengewicht vorbelegt. Beide Werte k&#246;nnen vor dem Schreiben ge&#228;ndert werden.</string>
+    <string name="weight_help">Beim Materialwechsel wird das aus der Materialdatei gespeicherte Spulengewicht vorbelegt. Beide Werte können vor dem Schreiben geändert werden.</string>
     <string name="button_read">Tag lesen</string>
     <string name="button_write">Tag schreiben</string>
     <string name="button_details">Alle gespeicherten Werte</string>
@@ -55,20 +55,20 @@
     <string name="label_timestamp">Zeit und Nutzung</string>
     <string name="label_batch">Batch</string>
     <string name="label_station">Station</string>
-    <string name="label_crc">Integrit&#228;t</string>
+    <string name="label_crc">Integrität</string>
     <string name="details_empty">Noch keine Detaildaten. Lies zuerst einen Tag.</string>
     <string name="dialog_brand">Hersteller</string>
     <string name="dialog_material">Material</string>
     <string name="dialog_color">Farbe</string>
     <string name="dialog_guid">Material-GUID</string>
     <string name="dialog_weight">Spulengewicht (g)</string>
-    <string name="content_menu">Men&#252; &#246;ffnen</string>
-    <string name="content_back">Zur&#252;ck</string>
-    <string name="content_add">Material hinzuf&#252;gen</string>
+    <string name="content_menu">Menü öffnen</string>
+    <string name="content_back">Zurück</string>
+    <string name="content_add">Material hinzufügen</string>
     <string name="content_edit">Material bearbeiten</string>
-    <string name="content_delete">Material l&#246;schen</string>
+    <string name="content_delete">Material löschen</string>
     <string name="content_import_database">Materialdateien in die Datenbank importieren</string>
-    <string name="materials_empty">Die Materialdatenbank ist leer.\nLege &#252;ber + ein Material an oder importiere Materialdateien &#252;ber das Import-Symbol.</string>
+    <string name="materials_empty">Die Materialdatenbank ist leer.\nLege über + ein Material an oder importiere Materialdateien über das Import-Symbol.</string>
     <string name="read_page_result">Ergebnis</string>
     <string name="result_manufacturer">Hersteller</string>
     <string name="result_material">Material</string>
@@ -79,6 +79,8 @@
     <string name="result_elapsed">Vergangen</string>
     <string name="result_date">Datum</string>
     <string name="result_not_available">Nicht verfügbar</string>
+    <string name="result_chip_uid">Chip-UID</string>
+    <string name="result_material_guid">Material-GUID</string>
     <string name="read_page_details">Alle Werte</string>
     <string name="read_page_raw">Rohdaten</string>
     <string name="button_copy_page">Kopieren</string>
@@ -87,7 +89,7 @@
     <string name="content_gallery_details">Alle Werte anzeigen</string>
     <string name="content_gallery_raw">Rohdaten anzeigen</string>
     <string name="copy_no_data">Noch keine Daten zum Kopieren vorhanden.</string>
-    <string name="copy_clipboard_unavailable">Die Zwischenablage ist auf diesem Ger&#228;t nicht verf&#252;gbar.</string>
+    <string name="copy_clipboard_unavailable">Die Zwischenablage ist auf diesem Gerät nicht verfügbar.</string>
     <string name="copy_result_done">Ergebnis wurde kopiert.</string>
     <string name="clipboard_result_label">Spool Maker Ergebnis</string>
 </resources>

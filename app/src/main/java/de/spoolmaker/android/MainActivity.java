@@ -106,7 +106,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private TextView textTimestamp;
     private TextView textBatch;
     private TextView textStation;
-    private TextView textCrc;
+    private TextView textChipUid;
+    private TextView textMaterialGuidSummary;
     private TextView textFullDetails;
     private TextView textDetailsEmpty;
     private TextView textRawDump;
@@ -328,7 +329,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
         message.setText(tr(
                 "Spool Maker could not be initialized completely.\n\n",
-                "Spool Maker konnte nicht vollstaendig initialisiert werden.\n\n")
+                "Spool Maker konnte nicht vollständig initialisiert werden.\n\n")
                 + startupError.getClass().getSimpleName() + ": " + detail);
         setContentView(message);
     }
@@ -596,7 +597,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         textTimestamp = findViewById(R.id.textTimestamp);
         textBatch = findViewById(R.id.textBatch);
         textStation = findViewById(R.id.textStation);
-        textCrc = findViewById(R.id.textCrc);
+        textChipUid = findViewById(R.id.textChipUid);
+        textMaterialGuidSummary = findViewById(R.id.textMaterialGuidSummary);
         textFullDetails = findViewById(R.id.textFullDetails);
         textDetailsEmpty = findViewById(R.id.textDetailsEmpty);
         textRawDump = findViewById(R.id.textRawDump);
@@ -637,7 +639,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (!(editRemainingWeightGrams.getParent() instanceof ViewGroup)) {
             throw new IllegalStateException(tr(
                     "Write section does not have a suitable container for date fields.",
-                    "Schreibbereich hat keinen geeigneten Container fuer Datumsfelder."));
+                    "Schreibbereich hat keinen geeigneten Container für Datumsfelder."));
         }
 
         ViewGroup parent = (ViewGroup) editRemainingWeightGrams.getParent();
@@ -1356,7 +1358,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (remainingWeightMg > totalWeightMg) {
                 throw new IllegalArgumentException(tr(
                         "Remaining material must not exceed the total amount.",
-                        "Restmaterial darf nicht groesser als die Gesamtmenge sein."));
+                        "Restmaterial darf nicht größer als die Gesamtmenge sein."));
             }
         } catch (IllegalArgumentException exception) {
             editRemainingWeightGrams.setError(exception.getMessage());
@@ -1565,12 +1567,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (value < 0 || (!allowZero && value == 0) || value > UltimakerTagCodec.MAX_UNSIGNED_INT) {
                 throw new IllegalArgumentException(tr(
                         "Weight is outside the tag format range.",
-                        "Gewicht liegt ausserhalb des Tagformats."));
+                        "Gewicht liegt außerhalb des Tagformats."));
             }
             return value;
         } catch (NumberFormatException | ArithmeticException exception) {
             throw new IllegalArgumentException(tr(
-                    "Invalid weight.", "Ungueltiges Gewicht."), exception);
+                    "Invalid weight.", "Ungültiges Gewicht."), exception);
         }
     }
 
@@ -1609,12 +1611,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 + remaining + (percentage.isEmpty() ? "" : " (" + percentage + ")"));
 
         textBatch.setText(formatSummaryDateLine(decoded));
-        textStation.setText(getString(R.string.result_usage_duration) + " "
+        textStation.setText(getString(R.string.result_usage_duration) + ": "
                 + formatDurationCompact(decoded.getTotalUsageDurationSecondsUnsigned()));
-
-        // Technical UID/GUID/batch/station/integrity data remains available on
-        // the "All values" page; keep the compact result page focused.
-        textCrc.setVisibility(View.GONE);
+        textChipUid.setText(getString(R.string.result_chip_uid) + ": " + uid);
+        textMaterialGuidSummary.setText(getString(R.string.result_material_guid)
+                + ": " + decoded.getMaterialGuid());
 
         lastDetailsText = buildFullDetails(uid, decoded);
         lastRawDumpText = buildRawDump(memory);
@@ -1640,13 +1641,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         appendHeading(out, tr("TAG AND NDEF", "TAG UND NDEF"));
         appendValue(out, "Chip-UID", uid);
         appendValue(out, tr("Material record serial field", "Materialrecord-Serienfeld"), emptyAsMarker(decoded.getSerial()));
-        appendValue(out, tr("Data range passed to decoder", "An Decoder uebergebener Datenbereich"), decoded.getReadMemoryLength() + " Byte");
+        appendValue(out, tr("Data range passed to decoder", "An Decoder übergebener Datenbereich"), decoded.getReadMemoryLength() + " Byte");
         appendValue(out, tr("Data range", "Datenbereich"), tr("NTAG page 4 to ", "NTAG-Seite 4 bis ")
                 + (NtagIo.FIRST_USER_PAGE + decoded.getReadMemoryLength() / 4 - 1));
         appendValue(out, tr("NDEF storage", "NDEF-Ablage"), decoded.isTlvWrapped()
                 ? "NFC-Forum-Type-2-TLV" : tr("raw NDEF byte stream from page 4", "roher NDEF-Bytestrom ab Seite 4"));
         appendValue(out, "NDEF offset", decoded.getNdefOffset() + tr(" bytes from user memory", " Byte ab Benutzerspeicher"));
-        appendValue(out, tr("NDEF length", "NDEF-Laenge"), decoded.getNdefLength() + " Byte");
+        appendValue(out, tr("NDEF length", "NDEF-Länge"), decoded.getNdefLength() + " Byte");
         appendValue(out, "NDEF-Records", Integer.toString(decoded.getNdefRecords().size()));
         appendValue(out, tr("Material records", "Materialrecords"), Integer.toString(decoded.getMaterialRecordCount()));
         appendValue(out, tr("Signature records", "Signaturrecords"), Integer.toString(decoded.getSignatureRecordCount()));
@@ -1654,7 +1655,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         appendHeading(out, tr("MATERIAL RECORD", "MATERIALRECORD"));
         appendValue(out, tr("Format version", "Formatversion"), Integer.toString(decoded.getMaterialVersion()));
-        appendValue(out, tr("Compatibility version", "Kompatibilitaetsversion"), Integer.toString(decoded.getMaterialCompatibility()));
+        appendValue(out, tr("Compatibility version", "Kompatibilitätsversion"), Integer.toString(decoded.getMaterialCompatibility()));
         appendValue(out, tr("Serial number (14-byte field)", "Seriennummer (14-Byte-Feld)"), emptyAsMarker(decoded.getSerial()));
         appendValue(out, tr("Raw time field (hex)", "Zeitfeld roh (Hex)"), decoded.getTimeFieldRawHex());
         appendValue(out, tr("Raw time field (uint64)", "Zeitfeld roh (uint64)"), decoded.getTimeFieldUnsigned().toString());
@@ -1687,7 +1688,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             appendHeading(out, "STATUSRECORD " + status.getIndex()
                     + (status.getIndex() == decoded.getActiveStatusRecordIndex() ? tr(" (ACTIVE)", " (AKTIV)") : ""));
             appendValue(out, tr("Format version", "Formatversion"), Integer.toString(status.getVersion()));
-            appendValue(out, tr("Compatibility version", "Kompatibilitaetsversion"), Integer.toString(status.getCompatibility()));
+            appendValue(out, tr("Compatibility version", "Kompatibilitätsversion"), Integer.toString(status.getCompatibility()));
             appendValue(out, tr("Unit", "Einheit"), status.getUnit() + " ("
                     + localizedUnitLabel(status.getUnit()) + ")");
             appendValue(out, tr("Raw total amount", "Gesamtmenge roh"), Long.toString(status.getTotalAmount()));
@@ -1707,12 +1708,12 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                     + String.format(Locale.US, "%02X", status.getStoredCrc()));
             appendValue(out, tr("Calculated CRC", "CRC berechnet"), "0x"
                     + String.format(Locale.US, "%02X", status.getCalculatedCrc()));
-            appendValue(out, tr("CRC valid", "CRC gueltig"), yesNo(status.isCrcValid()));
+            appendValue(out, tr("CRC valid", "CRC gültig"), yesNo(status.isCrcValid()));
             appendValue(out, "Payload (20 Byte)", status.getPayloadHex());
         }
 
         appendHeading(out, tr("CONSISTENCY", "KONSISTENZ"));
-        appendValue(out, tr("All status CRCs valid", "Alle Status-CRC gueltig"), yesNo(decoded.isStatusCrcValid()));
+        appendValue(out, tr("All status CRCs valid", "Alle Status-CRC gültig"), yesNo(decoded.isStatusCrcValid()));
         appendValue(out, tr("Active status record", "Aktiver Statusrecord"), Integer.toString(decoded.getActiveStatusRecordIndex()));
         appendValue(out, tr("Status records byte-identical (information only)", "Statusrecords bytegleich (nur Information)"), yesNo(decoded.isDuplicateStatusMatches()));
         appendValue(out, tr("UID matches serial field", "UID entspricht Serienfeld"),
@@ -1720,13 +1721,13 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         appendValue(out, tr("Signature marker 0x2000 present", "Sig-Marker 0x2000 vorhanden"), yesNo(decoded.hasExpectedSigMarker()));
         appendValue(out, tr("Expected four-record NDEF layout", "Erwartetes Vier-Record-NDEF-Layout"),
                 yesNo(UltimakerTagCodec.hasExpectedNdefLayout(decoded)));
-        appendValue(out, tr("Overall integrity", "Gesamtintegritaet"),
+        appendValue(out, tr("Overall integrity", "Gesamtintegrität"),
                 yesNo(UltimakerTagCodec.isIntegrityValid(uid, decoded)));
 
         appendHeading(out, tr("ALL NDEF RECORDS", "ALLE NDEF-RECORDS"));
         for (UltimakerTagCodec.DecodedNdefRecord record : decoded.getNdefRecords()) {
             out.append("Record ").append(record.getIndex()).append('\n');
-            appendValue(out, tr("  Offset/length", "  Offset/Laenge"), record.getOffset() + " / "
+            appendValue(out, tr("  Offset/length", "  Offset/Länge"), record.getOffset() + " / "
                     + record.getRecordLength() + " Byte");
             appendValue(out, tr("  Header flags", "  Headerflags"), "0x"
                     + String.format(Locale.US, "%02X", record.getFlags())
@@ -1875,13 +1876,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     }
 
     private String formatSummaryDateLine(UltimakerTagCodec.DecodedSpool decoded) {
-        if (!decoded.isSpoolMakerTag() || !decoded.hasSpoolMakerDate()) {
+        double seconds = decoded.getTimeFieldDoubleSeconds();
+        String date = formatSummaryDate(seconds);
+
+        if (!decoded.isSpoolMakerTag()) {
+            return getString(R.string.result_date) + ": " + date;
+        }
+        if (!decoded.hasSpoolMakerDate()) {
             return getString(R.string.result_date) + ": "
                     + getString(R.string.result_not_available);
         }
 
-        double seconds = decoded.getTimeFieldDoubleSeconds();
-        String date = formatSummaryDate(seconds);
         String age = formatCustomDateAge(decoded);
         return dateMeaningLabel(decoded.getDateMeaning()) + ": " + date
                 + " (" + getString(R.string.result_elapsed) + ": " + age + ")";
@@ -1978,7 +1983,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         if (!Double.isFinite(millis) || millis > Long.MAX_VALUE || millis < Long.MIN_VALUE) {
             return formatDoubleSeconds(seconds)
                     + tr(" (outside the Android date range)",
-                    " (ausserhalb des Android-Datumsbereichs)");
+                    " (außerhalb des Android-Datumsbereichs)");
         }
         Date date = new Date(Math.round(millis));
         DateFormat formatter = dateOnly
@@ -2047,7 +2052,7 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private String formatDuration(BigInteger seconds) {
         if (seconds.bitLength() > 63) {
             return seconds + tr(" s (too large for time decomposition)",
-                    " s (zu gross fuer Zeitzerlegung)");
+                    " s (zu gross für Zeitzerlegung)");
         }
         long value = seconds.longValue();
         long hours = value / 3600L;

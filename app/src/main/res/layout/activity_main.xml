@@ -240,11 +240,20 @@
                                 android:textColor="@color/text_primary" />
 
                             <TextView
-                                android:id="@+id/textCrc"
+                                android:id="@+id/textChipUid"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="14dp"
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
+
+                            <TextView
+                                android:id="@+id/textMaterialGuidSummary"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="7dp"
-                                android:textColor="@color/text_primary" />
+                                android:textColor="@color/text_primary"
+                                android:textIsSelectable="true" />
                         </LinearLayout>
                     </ScrollView>
 

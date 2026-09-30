@@ -24,7 +24,7 @@ public final class MaterialProfile {
         this.color = clean(color, "Farbe");
         this.guid = normalizeGuid(guid);
         if (spoolWeightMg < 0 || spoolWeightMg > 0xFFFF_FFFFL) {
-            throw new IllegalArgumentException("Spulengewicht liegt ausserhalb des Tagformats.");
+            throw new IllegalArgumentException("Spulengewicht liegt außerhalb des Tagformats.");
         }
         this.spoolWeightMg = spoolWeightMg;
     }
