@@ -1,4 +1,4 @@
-# Spool Maker Android 1.2.3
+# Spool Maker Android 1.2.4
 
 Vollstaendiges Android-Studio-/Gradle-Projekt fuer eine Android-Portierung von
 DA-Osbornes **Spool-Maker**. Die App liest und schreibt das von dem Upstream-
@@ -9,30 +9,43 @@ Upstream / technische Grundlage:
 https://github.com/DA-Osborne/Spool-Maker
 
 Aktuelles Release:
-https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.3
+https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.4
 
 Dieses Projekt ist Community-Software und kein offizielles Produkt von
 UltiMaker oder DA-Osborne.
 
-## Stand 1.2.3
+## Stand 1.2.4
 
-Version 1.2.3 enthaelt die englische und deutsche Benutzeroberflaeche sowie die
-aktualisierten F-Droid-Metadaten und Screenshots. Die App verwendet
-standardmaessig die Systemsprache. Ist die Systemsprache Deutsch, wird die
-deutsche Oberflaeche verwendet; bei Englisch die englische. Fuer alle anderen
-Systemsprachen dient Englisch als Fallback.
+Version 1.2.4 bringt die getestete Korrektur fuer die Statusleiste unter
+Android 15+ (einschliesslich Motorola-Geraeten), modernisiert die
+Sprachumschaltung auf Android-App-Sprachen und vereinfacht die Ergebnisansicht
+beim Lesen eines Tags.
 
-Die Sprache kann jederzeit ueber das Seitenmenue geaendert werden. Die
-Sprachauswahl ist wie Materialbibliothek, Info und Lizenz als eigene Seite mit
-Zurueck-Navigation umgesetzt. Zur Auswahl stehen **System default / Systemkonfiguration**,
-**German / Deutsch** und **English / Englisch**.
+Ab Android 13 verwendet die App die Android-API fuer App-Sprachen
+(`LocaleManager`); auf aelteren Android-Versionen bleibt die kompatible
+Fallback-Implementierung erhalten. Zur Auswahl stehen
+**System default / Systemkonfiguration**, **German / Deutsch** und
+**English / Englisch**. Die Auswahl ist eindeutig, sodass immer nur genau eine
+Sprache aktiv ist.
+
+Die kompakte Ergebnisansicht zeigt jetzt Hersteller, Material, Farbe,
+Spulen- und Restgewicht, Datum, Nutzungsdauer, Chip-UID und Material-GUID.
+Unbekannte Material-GUIDs werden ausdruecklich als
+**Material-GUID nicht in Datenbank** gekennzeichnet. Originale
+UltiMaker-Tags zeigen ihren interpretierten Datumswert ebenfalls direkt an.
 
 Enthalten sind unter anderem:
 
-- Englische und deutsche UI-Lokalisierung mit systemabhaengiger Vorauswahl und
-  englischem Fallback fuer nicht unterstuetzte Systemsprachen.
-- Vollbild-Sprachauswahl mit Zurueck-Pfeil und sofortiger Umschaltung der
-  Oberflaechensprache.
+- Englische und deutsche UI-Lokalisierung mit Android-App-Sprachen ab
+  Android 13 und kompatiblem Fallback auf aelteren Versionen.
+- Eindeutige Sprachauswahl mit sofortiger Umschaltung der Oberflaechensprache.
+- Android-15+-Statusleisten-Korrektur mit AndroidX `ProtectionLayout`, getestet
+  auch auf Motorola-Hardware.
+- Kompakte Ergebnisansicht mit Hersteller, Material, Farbe, Gewichten,
+  Restprozent, Datum, Nutzungsdauer, Chip-UID und Material-GUID.
+- Klarer Hinweis **Material-GUID nicht in Datenbank** fuer unbekannte
+  Materialprofile.
+- Datumsanzeige auch fuer originale UltiMaker-Tags.
 - Aktualisierte F-Droid-Store-Beschreibungen und Screenshot-Galerien fuer
   Deutsch und Englisch.
 - NFC-Lesen und -Schreiben ueber den NFC-A-Reader-Mode von Android.
@@ -67,8 +80,8 @@ Enthalten sind unter anderem:
 - Die Lizenzseite zeigt Herkunft, Copyright, Aenderungsstand, Quellcode und den
   vollstaendigen GPL-Text.
 
-Das NFC-Tag-Format und die Materialverarbeitung wurden durch die
-Sprachunterstuetzung und die Store-Metadaten-Aktualisierung nicht veraendert.
+Das NFC-Tag-Format und die Materialverarbeitung wurden durch diese
+UI-, Sprach- und Darstellungsanpassungen nicht veraendert.
 
 ## Projekt oeffnen
 
@@ -78,9 +91,13 @@ Sprachunterstuetzung und die Store-Metadaten-Aktualisierung nicht veraendert.
 4. Gradle-Synchronisierung ausfuehren.
 5. Ein echtes Android-Geraet mit NFC verwenden.
 
-Das Projekt ist auf Java 17 eingestellt und verwendet den mitgelieferten,
-checksum-geprueften Gradle-Bootstrap. Auf einem Rechner mit Internetzugang laedt
-dieser die in `gradle/wrapper/gradle-wrapper.properties` konfigurierte Version.
+Die Build-Umgebung verwendet JDK 21. Der Java-Quellcode bleibt bewusst auf
+Source-/Target-Kompatibilitaet 17 eingestellt. GitHub CI, GitHub Releases und
+die F-Droid-Buildkonfiguration verwenden JDK 21.
+
+Das Projekt verwendet den mitgelieferten, checksum-geprueften Gradle-Bootstrap.
+Auf einem Rechner mit Internetzugang laedt dieser die in
+`gradle/wrapper/gradle-wrapper.properties` konfigurierte Version.
 
 ### Debug-APK
 
@@ -101,8 +118,8 @@ Android akzeptiert ein Update nur mit demselben Paketnamen, einem hoeheren
 
 ```text
 applicationId: de.spoolmaker.android
-versionName:   1.2.3
-versionCode:   32
+versionName:   1.2.4
+versionCode:   33
 ```
 
 Der `versionCode` wird ueber Releases hinweg fortlaufend erhoeht, damit Android
@@ -185,14 +202,19 @@ GPL-3.0-or-later. Siehe `LICENSE` und `NOTICE.md`.
 
 Dieses Repository enthaelt Workflows unter `.github/workflows/`:
 
-- `ci.yml` fuehrt Standalone-Codec-Test, Android-Unit-Tests, Lint und Debug-Build
-  aus.
-- `release.yml` reagiert auf Versions-Tags (`v*`), prueft, dass der Tag zur
-  `versionName` passt, und baut danach eine signierte Release-APK.
+- `ci.yml` fuehrt mit JDK 21 Standalone-Codec-Test, Android-Unit-Tests, Lint
+  und Debug-Build aus.
+- `release.yml` verwendet JDK 21, reagiert auf Versions-Tags (`v*`), prueft,
+  dass der Tag zur `versionName` passt, und baut danach eine signierte
+  Release-APK.
 
 Die Signierschluessel werden ausschliesslich ueber GitHub Secrets bereitgestellt
 und gehoeren niemals ins Repository.
 
-F-Droid-Store-Metadaten liegen unter `fastlane/metadata/android/`. Eine Vorlage
-fuers spaetere `fdroiddata`-Merge-Request liegt unter
-`fdroid/de.spoolmaker.android.yml.template`.
+F-Droid-Store-Metadaten liegen unter `fastlane/metadata/android/`. Die
+`fdroiddata`-Vorlage liegt unter
+`fdroid/de.spoolmaker.android.yml.template` und ist fuer Version 1.2.4 /
+versionCode 33 sowie JDK 21 vorbereitet.
+
+Der aktuelle F-Droid-Merge-Request:
+https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47798
