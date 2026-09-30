@@ -1,0 +1,31 @@
+name: Publish v1.2.4 tag
+
+on:
+  push:
+    branches:
+      - release/1.2.4-tag
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create v1.2.4 tag on final main commit
+        shell: bash
+        run: |
+          git fetch origin main --tags
+          test "$(git rev-parse origin/main)" = "c4ba38c24269fc66455fbda48f7d08faf2031ef4" || {
+            echo "main moved; refusing to tag"
+            exit 1
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v1.2.4 "c4ba38c24269fc66455fbda48f7d08faf2031ef4" -m "Spool Maker v1.2.4"
+          git push origin v1.2.4
