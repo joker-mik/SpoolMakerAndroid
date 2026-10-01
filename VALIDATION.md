@@ -1,8 +1,24 @@
-# Validierungsbericht — Spool Maker Android 1.2.0
+# Validierungsbericht — Spool Maker Android 1.2.4
+
+## Dokumentationsabgleich am 2026-10-01
+
+- Gepruefter `main`-Stand: `b34e98581d35088016da58fa998b762964447577`.
+- GitHub-Release `v1.2.4` wurde am 2026-09-30 veroeffentlicht.
+- `app/build.gradle` und `fdroid/de.spoolmaker.android.yml.template` enthalten
+  `versionName` 1.2.4 / `versionCode` 33.
+- Die deutschen und englischen Fastlane-Releasehinweise in
+  `fastlane/metadata/android/{de-DE,en-US}/changelogs/33.txt` sind vorhanden
+  und bilden die Grundlage fuer den Abschnitt 1.2.4 in `CHANGELOG.md`.
+
+Dieser Abgleich betrifft nur die Dokumentation. Fuer 1.2.4 wurden dabei keine
+Builds, automatisierten Tests oder Geraetetests ausgefuehrt. Die folgenden
+Pruefergebnisse beziehen sich ausschliesslich auf den historischen Stand 1.2.0.
+
+## Historischer Validierungsbericht — Spool Maker Android 1.2.0
 
 Datum: 2026-08-25
 
-## Quellstand
+### Quellstand
 
 - Paketname: `de.spoolmaker.android`
 - `versionName`: `1.2.0`
@@ -14,7 +30,7 @@ Datum: 2026-08-25
 - Gradle-Bootstrap: 9.5.0
 - Java-Quellziel: 17
 
-## Durchgefuehrte lokale Pruefungen
+### Durchgefuehrte lokale Pruefungen
 
 - Alle 35 XML-Dateien unter `app/src/main` wurden als wohlgeformtes XML geparst.
 - GitHub-Workflow-YAML und F-Droid-Vorlage wurden mit einem YAML-Parser geladen.
@@ -39,7 +55,7 @@ Datum: 2026-08-25
   inhaltlich unveraendert; nur der separate Versionsstring wurde auf 1.2.0
   gesetzt.
 
-## Nicht durchgefuehrt
+### Nicht durchgefuehrt
 
 Ein vollstaendiger Android-Gradle-Build, Android Lint und die echten Gradle-
 JUnit-Tasks konnten in dieser Laufzeit nicht ausgefuehrt werden. Der

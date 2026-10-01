@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4
+
+- Improved Android 15+ status bar handling, including Motorola devices.
+- Switched app language handling to Android per-app locales and fixed exclusive language selection.
+- Simplified the read result page.
+- Improved original UltiMaker date display.
+- Cleaned up German translations.
+- Updated version information to 1.2.4 / versionCode 33.
+
 ## 1.2.3
 
 - Updated F-Droid store metadata and expanded the German and English app descriptions.
