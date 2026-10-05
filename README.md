@@ -8,8 +8,17 @@ tags.
 Upstream / technical basis:
 https://github.com/DA-Osborne/Spool-Maker
 
-Current release:
+Current GitHub release:
 https://github.com/joker-mik/SpoolMakerAndroid/releases/tag/v1.2.4
+
+## Install
+
+Spool Maker is available from the official F-Droid repository:
+
+https://f-droid.org/en/packages/de.spoolmaker.android/
+
+F-Droid is the recommended way to install the app if you want repository-based
+updates. The signed APK is also available from GitHub Releases.
 
 This project is community software and is not an official product of UltiMaker
 or DA-Osborne.
@@ -208,9 +217,11 @@ Signing keys are provided exclusively through GitHub Secrets and are never
 stored in the repository.
 
 F-Droid store metadata is located under `fastlane/metadata/android/`. The
-`fdroiddata` template is located at
-`fdroid/de.spoolmaker.android.yml.template` and is prepared for version 1.2.4,
-versionCode 33, and JDK 21.
+local `fdroiddata` template is located at
+`fdroid/de.spoolmaker.android.yml.template`.
 
-Current F-Droid merge request:
-https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47798
+Spool Maker is published in the official F-Droid repository:
+
+https://f-droid.org/en/packages/de.spoolmaker.android/
+
+The current F-Droid release is version 1.2.4 (versionCode 33).
