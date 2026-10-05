@@ -5,6 +5,9 @@ DA-Osborne's **Spool-Maker**. The app reads and writes the UltiMaker-compatible
 NFC spool format implemented by the upstream project on NTAG215 and NTAG216
 tags.
 
+This project is community software and is not an official product of UltiMaker
+or DA-Osborne.
+
 Upstream / technical basis:
 https://github.com/DA-Osborne/Spool-Maker
 
@@ -20,8 +23,6 @@ https://f-droid.org/en/packages/de.spoolmaker.android/
 F-Droid is the recommended way to install the app if you want repository-based
 updates. The signed APK is also available from GitHub Releases.
 
-This project is community software and is not an official product of UltiMaker
-or DA-Osborne.
 
 ## Version 1.2.4
 
