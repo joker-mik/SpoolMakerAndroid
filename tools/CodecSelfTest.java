@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 import de.spoolmaker.android.nfc.UltimakerTagCodec;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -100,6 +101,26 @@ public final class CodecSelfTest {
                 "Damaged signature marker was not detected");
         require(!UltimakerTagCodec.isIntegrityValid(uid, damagedSignatureDecoded),
                 "Damaged signature marker must fail overall integrity");
+
+        byte[] customFields = UltimakerTagCodec.encodeSpool(
+                guid, uid, 95_000L, 47_500L,
+                UltimakerTagCodec.UNIT_MILLIMETRES,
+                BigInteger.valueOf(7_200L),
+                12,
+                "A2404100283",
+                UltimakerTagCodec.DateMeaning.MANUFACTURED,
+                timestamp);
+        UltimakerTagCodec.DecodedSpool customDecoded = UltimakerTagCodec.decode(customFields);
+        require(customDecoded.getUnit() == UltimakerTagCodec.UNIT_MILLIMETRES,
+                "Custom unit mismatch");
+        require(customDecoded.getTotalUsageDurationSeconds() == 7_200L,
+                "Custom usage duration mismatch");
+        require(customDecoded.getStationId() == 12,
+                "Custom station ID mismatch");
+        require("A2404100283".equals(customDecoded.getBatchCode()),
+                "Custom batch code mismatch");
+        require(UltimakerTagCodec.isIntegrityValid(uid, customDecoded),
+                "Custom fields integrity should be valid");
 
         System.out.println("CodecSelfTest OK");
         System.out.println("Encoded bytes: " + encoded.length);

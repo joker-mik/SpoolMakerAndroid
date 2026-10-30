@@ -40,8 +40,10 @@ public final class UltimakerTagCodec {
     private static final int MATERIAL_PAYLOAD_LENGTH = 108;
     private static final int MATERIAL_INTERPRETED_LENGTH = 106;
     private static final int STATUS_PAYLOAD_LENGTH = 20;
-    private static final int DEFAULT_STATION_ID = 0xAFFE;
-    private static final String DEFAULT_BATCH_CODE = "123456789AB";
+    public static final int DEFAULT_STATION_ID = 0xAFFE;
+    public static final int MAX_STATION_ID = 0xFFFF;
+    public static final String DEFAULT_BATCH_CODE = "123456789AB";
+    public static final int MAX_BATCH_CODE_BYTES = 64;
 
     // SpoolMaker extension inside the two bytes that S5/S8 firmware does not interpret.
     // Byte 106: 0x53 ('S'), byte 107: DateMeaning code.
@@ -78,25 +80,64 @@ public final class UltimakerTagCodec {
     }
 
     /**
-     * Encodes a new SpoolMaker tag.
-     *
-     * <p>This is intentionally the only writer entry point. New tags always use
-     * programming-station id 0xAFFE and SpoolMaker metadata in material bytes
-     * 106/107. If {@code dateMeaning != NONE}, the 8-byte material time field is
-     * written as a big-endian IEEE-754 double containing Unix seconds. For
-     * {@code NONE}, the time field is 0.0.</p>
+     * Encodes a new SpoolMaker tag with default unit (mg), zero usage duration,
+     * default station ID (0xAFFE), and default batch code ("123456789AB").
      */
     public static byte[] encodeSpool(String materialGuid, String uidHex,
                                      long totalWeightMg, long remainingWeightMg,
                                      DateMeaning dateMeaning, long dateEpochSeconds) {
-        if (totalWeightMg <= 0 || totalWeightMg > MAX_UNSIGNED_INT) {
+        return encodeSpool(
+                materialGuid,
+                uidHex,
+                totalWeightMg,
+                remainingWeightMg,
+                UNIT_MILLIGRAMS,
+                BigInteger.ZERO,
+                DEFAULT_STATION_ID,
+                DEFAULT_BATCH_CODE,
+                dateMeaning,
+                dateEpochSeconds);
+    }
+
+    /**
+     * Encodes a complete UltiMaker spool tag with all programmable MaterialRecordV0
+     * and StatRecordV0 fields.
+     */
+    public static byte[] encodeSpool(String materialGuid, String uidHex,
+                                     long totalAmount, long remainingAmount,
+                                     int unit, BigInteger totalUsageDurationSeconds,
+                                     int stationId, String batchCode,
+                                     DateMeaning dateMeaning, long dateEpochSeconds) {
+        if (totalAmount <= 0 || totalAmount > MAX_UNSIGNED_INT) {
             throw new IllegalArgumentException(
                     "Gesamtgewicht liegt außerhalb des 32-Bit-Tagformats.");
         }
-        if (remainingWeightMg < 0 || remainingWeightMg > totalWeightMg
-                || remainingWeightMg > MAX_UNSIGNED_INT) {
+        if (remainingAmount < 0 || remainingAmount > totalAmount
+                || remainingAmount > MAX_UNSIGNED_INT) {
             throw new IllegalArgumentException(
                     "Restgewicht muss zwischen 0 und Gesamtgewicht liegen.");
+        }
+        if (unit < UNIT_UNUSED || unit > UNIT_CUBIC_CENTIMETRES) {
+            throw new IllegalArgumentException("Ungültige Materialeinheit.");
+        }
+        if (totalUsageDurationSeconds == null
+                || totalUsageDurationSeconds.signum() < 0
+                || totalUsageDurationSeconds.bitLength() > 64) {
+            throw new IllegalArgumentException("Nutzungsdauer passt nicht in uint64.");
+        }
+        if (stationId < 0 || stationId > MAX_STATION_ID) {
+            throw new IllegalArgumentException(
+                    "Stations-ID muss zwischen 0 und 65535 (0xFFFF) liegen.");
+        }
+        String normalizedBatch = batchCode == null ? "" : batchCode;
+        if (normalizedBatch.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException(
+                    "Batchcode darf keine Nullbytes enthalten.");
+        }
+        byte[] batchBytes = normalizedBatch.getBytes(StandardCharsets.UTF_8);
+        if (batchBytes.length > MAX_BATCH_CODE_BYTES) {
+            throw new IllegalArgumentException(
+                    "Batchcode darf maximal 64 UTF-8-Bytes lang sein.");
         }
         if (dateMeaning == null) {
             throw new IllegalArgumentException("Datumsart fehlt.");
@@ -122,12 +163,12 @@ public final class UltimakerTagCodec {
                 materialUuid,
                 serial,
                 dateBits,
+                stationId,
+                batchBytes,
                 new byte[]{(byte) SPOOLMAKER_DATE_MARKER, (byte) dateMeaning.getCode()});
 
-        // A newly created tag starts with two identical valid status records.
-        // The printer will alternate them later. Usage starts at zero.
         byte[] statusPayload = encodeStatusPayload(
-                totalWeightMg, remainingWeightMg, BigInteger.ZERO);
+                unit, totalAmount, remainingAmount, totalUsageDurationSeconds);
         byte[] signaturePayload = new byte[]{0x20, 0x00};
 
         ByteArrayOutputStream output = new ByteArrayOutputStream(228);
@@ -367,6 +408,7 @@ public final class UltimakerTagCodec {
     }
 
     private static byte[] encodeMaterialPayload(UUID guid, String serial, long timeFieldBits,
+                                                int stationId, byte[] batchBytes,
                                                 byte[] trailingBytes) {
         ByteBuffer buffer = ByteBuffer.allocate(MATERIAL_PAYLOAD_LENGTH)
                 .order(ByteOrder.BIG_ENDIAN);
@@ -376,14 +418,14 @@ public final class UltimakerTagCodec {
         buffer.putLong(timeFieldBits);
         buffer.putLong(guid.getMostSignificantBits());
         buffer.putLong(guid.getLeastSignificantBits());
-        buffer.putShort((short) DEFAULT_STATION_ID);
-        putFixed(buffer, DEFAULT_BATCH_CODE.getBytes(StandardCharsets.UTF_8), 64);
+        buffer.putShort((short) (stationId & 0xFFFF));
+        putFixed(buffer, batchBytes, MAX_BATCH_CODE_BYTES);
         buffer.put(trailingBytes[0]);
         buffer.put(trailingBytes[1]);
         return buffer.array();
     }
 
-    private static byte[] encodeStatusPayload(long totalWeightMg, long remainingWeightMg,
+    private static byte[] encodeStatusPayload(int unit, long totalAmount, long remainingAmount,
                                               BigInteger totalUsageDurationSeconds) {
         if (totalUsageDurationSeconds.signum() < 0
                 || totalUsageDurationSeconds.bitLength() > 64) {
@@ -393,9 +435,9 @@ public final class UltimakerTagCodec {
                 .order(ByteOrder.BIG_ENDIAN);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
-        buffer.put((byte) UNIT_MILLIGRAMS);
-        buffer.putInt((int) totalWeightMg);
-        buffer.putInt((int) remainingWeightMg);
+        buffer.put((byte) (unit & 0xFF));
+        buffer.putInt((int) totalAmount);
+        buffer.putInt((int) remainingAmount);
         buffer.put(toUnsignedFixed(totalUsageDurationSeconds, 8));
         byte[] payload = buffer.array();
         payload[19] = (byte) crc8(payload, 0, 19);
@@ -1012,13 +1054,13 @@ public final class UltimakerTagCodec {
         public String getMaterialTrailingHex() { return materialTrailingHex; }
 
         public boolean isSpoolMakerTag() {
-            if (stationId != DEFAULT_STATION_ID || materialTrailingHex == null
-                    || materialTrailingHex.length() < 4) {
+            if (materialTrailingHex == null || materialTrailingHex.length() < 4) {
                 return false;
             }
             try {
                 int marker = Integer.parseInt(materialTrailingHex.substring(0, 2), 16);
-                return marker == SPOOLMAKER_DATE_MARKER;
+                int code = Integer.parseInt(materialTrailingHex.substring(2, 4), 16);
+                return marker == SPOOLMAKER_DATE_MARKER && code >= 0 && code <= 4;
             } catch (NumberFormatException ignored) {
                 return false;
             }

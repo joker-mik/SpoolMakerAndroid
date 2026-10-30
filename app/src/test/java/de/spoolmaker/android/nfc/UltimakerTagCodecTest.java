@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -227,6 +228,34 @@ public final class UltimakerTagCodecTest {
                 "04:A1:B2:C3:D4:E5:F6", UID));
         assertFalse(UltimakerTagCodec.uidMatchesSerial(
                 "04:A1:B2:C3:D4:E5:F7", UID));
+    }
+
+    @Test
+    public void customBatchStationUnitAndUsageDurationRoundTrip() {
+        BigInteger duration = BigInteger.valueOf(14_400L);
+        byte[] encoded = UltimakerTagCodec.encodeSpool(
+                GUID, UID, 95_000L, 47_500L,
+                UltimakerTagCodec.UNIT_MILLIMETRES,
+                duration,
+                12,
+                "A2404100283",
+                UltimakerTagCodec.DateMeaning.MANUFACTURED,
+                DATE_SECONDS);
+
+        assertEquals(228, encoded.length);
+        UltimakerTagCodec.DecodedSpool decoded = UltimakerTagCodec.decode(encoded);
+
+        assertEquals(GUID, decoded.getMaterialGuid());
+        assertEquals(UID, decoded.getSerial());
+        assertEquals(UltimakerTagCodec.UNIT_MILLIMETRES, decoded.getUnit());
+        assertEquals(95_000L, decoded.getTotalAmount());
+        assertEquals(47_500L, decoded.getRemainingAmount());
+        assertEquals(duration, decoded.getTotalUsageDurationSecondsUnsigned());
+        assertEquals(12, decoded.getStationId());
+        assertEquals("A2404100283", decoded.getBatchCode());
+        assertEquals(UltimakerTagCodec.DateMeaning.MANUFACTURED, decoded.getDateMeaning());
+        assertTrue(decoded.isSpoolMakerTag());
+        assertTrue(UltimakerTagCodec.isIntegrityValid(UID, decoded));
     }
 
 

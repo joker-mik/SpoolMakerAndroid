@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.text.InputType;
 import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.view.LayoutInflater;
@@ -123,7 +124,17 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private Button buttonWrite;
     private Spinner spinnerWriteDateMeaning;
     private Button buttonWriteDate;
+    private Spinner spinnerWriteUnit;
+    private EditText editUsageDurationSeconds;
+    private EditText editBatchCode;
+    private EditText editStationId;
     private final Calendar selectedWriteDate = Calendar.getInstance();
+    private final int[] writeUnits = new int[]{
+            UltimakerTagCodec.UNIT_MILLIGRAMS,
+            UltimakerTagCodec.UNIT_MILLIMETRES,
+            UltimakerTagCodec.UNIT_CUBIC_CENTIMETRES,
+            UltimakerTagCodec.UNIT_UNUSED
+    };
     private final UltimakerTagCodec.DateMeaning[] writeDateMeanings = new UltimakerTagCodec.DateMeaning[]{
             UltimakerTagCodec.DateMeaning.OPENED,
             UltimakerTagCodec.DateMeaning.MANUFACTURED,
@@ -166,6 +177,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
     private volatile MaterialProfile pendingWriteMaterial;
     private volatile long pendingWriteTotalWeightMg;
     private volatile long pendingWriteRemainingWeightMg;
+    private volatile int pendingWriteUnit = UltimakerTagCodec.UNIT_MILLIGRAMS;
+    private volatile BigInteger pendingWriteUsageDurationSeconds = BigInteger.ZERO;
+    private volatile int pendingWriteStationId = UltimakerTagCodec.DEFAULT_STATION_ID;
+    private volatile String pendingWriteBatchCode = UltimakerTagCodec.DEFAULT_BATCH_CODE;
     private volatile UltimakerTagCodec.DateMeaning pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
     private volatile long pendingWriteDateEpochSeconds;
 
@@ -374,6 +389,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         final MaterialProfile writeMaterial;
         final long writeTotalWeightMg;
         final long writeRemainingWeightMg;
+        final int writeUnit;
+        final BigInteger writeUsageDurationSeconds;
+        final int writeStationId;
+        final String writeBatchCode;
         final UltimakerTagCodec.DateMeaning writeDateMeaning;
         final long writeDateEpochSeconds;
 
@@ -403,6 +422,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             writeMaterial = pendingWriteMaterial;
             writeTotalWeightMg = pendingWriteTotalWeightMg;
             writeRemainingWeightMg = pendingWriteRemainingWeightMg;
+            writeUnit = pendingWriteUnit;
+            writeUsageDurationSeconds = pendingWriteUsageDurationSeconds;
+            writeStationId = pendingWriteStationId;
+            writeBatchCode = pendingWriteBatchCode;
             writeDateMeaning = pendingWriteDateMeaning;
             writeDateEpochSeconds = pendingWriteDateEpochSeconds;
             clearPendingWriteDataLocked();
@@ -436,6 +459,8 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             byte[] encoded = UltimakerTagCodec.encodeSpool(
                     writeMaterial.getGuid(), uid,
                     writeTotalWeightMg, writeRemainingWeightMg,
+                    writeUnit, writeUsageDurationSeconds,
+                    writeStationId, writeBatchCode,
                     writeDateMeaning, writeDateEpochSeconds);
 
             NtagIo.WriteResult writeResult = NtagIo.writeAndVerifyUserMemory(tag, encoded);
@@ -445,6 +470,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             if (!decoded.getMaterialGuid().equals(writeMaterial.getGuid())
                     || decoded.getTotalAmount() != writeTotalWeightMg
                     || decoded.getRemainingAmount() != writeRemainingWeightMg
+                    || decoded.getUnit() != writeUnit
+                    || !decoded.getTotalUsageDurationSecondsUnsigned().equals(writeUsageDurationSeconds)
+                    || decoded.getStationId() != writeStationId
+                    || !decoded.getBatchCode().equals(writeBatchCode)
                     || !UltimakerTagCodec.isIntegrityValid(uid, decoded)
                     || !decoded.isSpoolMakerTag()
                     || decoded.getDateMeaning() != writeDateMeaning
@@ -718,6 +747,74 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         dateSection.addView(spinnerWriteDateMeaning);
         dateSection.addView(dateLabel);
         dateSection.addView(buttonWriteDate);
+
+        TextView unitLabel = new TextView(this);
+        unitLabel.setText(tr("Quantity unit", "Mengeneinheit"));
+        unitLabel.setTextColor(getColor(R.color.text_primary));
+        unitLabel.setTextSize(16f);
+        unitLabel.setTypeface(null, Typeface.BOLD);
+        unitLabel.setPadding(0, dp(10), 0, dp(4));
+
+        spinnerWriteUnit = new Spinner(this);
+        String[] unitLabels = new String[]{
+                tr("Grams / Milligrams (g -> mg)", "Gramm / Milligramm (g -> mg)"),
+                tr("Millimeters (mm)", "Millimeter (mm)"),
+                tr("Milliliters (cm3)", "Milliliter (cm3)"),
+                tr("Unused (0)", "Nicht verwendet (0)")
+        };
+        ArrayAdapter<String> unitAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, unitLabels);
+        unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerWriteUnit.setAdapter(unitAdapter);
+        spinnerWriteUnit.setSelection(0);
+
+        TextView usageLabel = new TextView(this);
+        usageLabel.setText(tr("Usage duration (seconds)", "Nutzungsdauer (Sekunden)"));
+        usageLabel.setTextColor(getColor(R.color.text_primary));
+        usageLabel.setTextSize(16f);
+        usageLabel.setTypeface(null, Typeface.BOLD);
+        usageLabel.setPadding(0, dp(10), 0, dp(4));
+
+        editUsageDurationSeconds = new EditText(this);
+        editUsageDurationSeconds.setInputType(InputType.TYPE_CLASS_NUMBER);
+        editUsageDurationSeconds.setMaxLines(1);
+        editUsageDurationSeconds.setHint("0");
+        editUsageDurationSeconds.setText("0");
+
+        TextView batchLabel = new TextView(this);
+        batchLabel.setText(tr("Batch code (max 64 UTF-8 bytes)", "Batchcode (max. 64 UTF-8-Byte)"));
+        batchLabel.setTextColor(getColor(R.color.text_primary));
+        batchLabel.setTextSize(16f);
+        batchLabel.setTypeface(null, Typeface.BOLD);
+        batchLabel.setPadding(0, dp(10), 0, dp(4));
+
+        editBatchCode = new EditText(this);
+        editBatchCode.setInputType(InputType.TYPE_CLASS_TEXT);
+        editBatchCode.setMaxLines(1);
+        editBatchCode.setHint(UltimakerTagCodec.DEFAULT_BATCH_CODE);
+        editBatchCode.setText(UltimakerTagCodec.DEFAULT_BATCH_CODE);
+
+        TextView stationLabel = new TextView(this);
+        stationLabel.setText(tr("Programming station ID (uint16)", "Programmierstations-ID (uint16)"));
+        stationLabel.setTextColor(getColor(R.color.text_primary));
+        stationLabel.setTextSize(16f);
+        stationLabel.setTypeface(null, Typeface.BOLD);
+        stationLabel.setPadding(0, dp(10), 0, dp(4));
+
+        editStationId = new EditText(this);
+        editStationId.setInputType(InputType.TYPE_CLASS_TEXT);
+        editStationId.setMaxLines(1);
+        editStationId.setHint("0xAFFE");
+        editStationId.setText("0xAFFE");
+
+        dateSection.addView(unitLabel);
+        dateSection.addView(spinnerWriteUnit);
+        dateSection.addView(usageLabel);
+        dateSection.addView(editUsageDurationSeconds);
+        dateSection.addView(batchLabel);
+        dateSection.addView(editBatchCode);
+        dateSection.addView(stationLabel);
+        dateSection.addView(editStationId);
 
         int insertIndex = parent.indexOfChild(editRemainingWeightGrams) + 1;
         parent.addView(dateSection, insertIndex, sectionParams);
@@ -1345,16 +1442,26 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             return;
         }
 
+        int unitPosition = spinnerWriteUnit == null ? 0 : spinnerWriteUnit.getSelectedItemPosition();
+        if (unitPosition < 0 || unitPosition >= writeUnits.length) {
+            unitPosition = 0;
+        }
+        int unit = writeUnits[unitPosition];
+
         long totalWeightMg;
         long remainingWeightMg;
         try {
-            totalWeightMg = parseWeightMg(editTotalWeightGrams.getText().toString(), false);
+            totalWeightMg = unit == UltimakerTagCodec.UNIT_MILLIGRAMS
+                    ? parseWeightMg(editTotalWeightGrams.getText().toString(), false)
+                    : parseRawUnitAmount(editTotalWeightGrams.getText().toString(), false);
         } catch (IllegalArgumentException exception) {
             editTotalWeightGrams.setError(exception.getMessage());
             return;
         }
         try {
-            remainingWeightMg = parseWeightMg(editRemainingWeightGrams.getText().toString(), true);
+            remainingWeightMg = unit == UltimakerTagCodec.UNIT_MILLIGRAMS
+                    ? parseWeightMg(editRemainingWeightGrams.getText().toString(), true)
+                    : parseRawUnitAmount(editRemainingWeightGrams.getText().toString(), true);
             if (remainingWeightMg > totalWeightMg) {
                 throw new IllegalArgumentException(tr(
                         "Remaining material must not exceed the total amount.",
@@ -1365,11 +1472,47 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
             return;
         }
 
-        showWriteConfirmation(profile, totalWeightMg, remainingWeightMg);
+        BigInteger usageDurationSeconds;
+        try {
+            usageDurationSeconds = parseUsageDurationSeconds(
+                    editUsageDurationSeconds == null ? "0" : editUsageDurationSeconds.getText().toString());
+        } catch (IllegalArgumentException exception) {
+            if (editUsageDurationSeconds != null) {
+                editUsageDurationSeconds.setError(exception.getMessage());
+            }
+            return;
+        }
+
+        String batchCode;
+        try {
+            batchCode = parseBatchCode(
+                    editBatchCode == null ? UltimakerTagCodec.DEFAULT_BATCH_CODE : editBatchCode.getText().toString());
+        } catch (IllegalArgumentException exception) {
+            if (editBatchCode != null) {
+                editBatchCode.setError(exception.getMessage());
+            }
+            return;
+        }
+
+        int stationId;
+        try {
+            stationId = parseStationId(
+                    editStationId == null ? "0xAFFE" : editStationId.getText().toString());
+        } catch (IllegalArgumentException exception) {
+            if (editStationId != null) {
+                editStationId.setError(exception.getMessage());
+            }
+            return;
+        }
+
+        showWriteConfirmation(profile, totalWeightMg, remainingWeightMg,
+                unit, usageDurationSeconds, stationId, batchCode);
     }
 
     private void showWriteConfirmation(MaterialProfile profile, long totalWeightMg,
-                                       long remainingWeightMg) {
+                                       long remainingWeightMg, int unit,
+                                       BigInteger usageDurationSeconds,
+                                       int stationId, String batchCode) {
         int datePosition = spinnerWriteDateMeaning == null
                 ? writeDateMeanings.length - 1
                 : spinnerWriteDateMeaning.getSelectedItemPosition();
@@ -1387,8 +1530,11 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         String message = profile.getDisplayName() + "\n"
                 + profile.getGuid() + "\n\n"
-                + tr("Total amount: ", "Gesamtmenge: ") + formatWeight(totalWeightMg) + "\n"
-                + tr("Remaining material: ", "Restmaterial: ") + formatWeight(remainingWeightMg) + "\n"
+                + tr("Total amount: ", "Gesamtmenge: ") + formatAmount(totalWeightMg, unit) + "\n"
+                + tr("Remaining material: ", "Restmaterial: ") + formatAmount(remainingWeightMg, unit) + "\n"
+                + tr("Usage duration: ", "Nutzungsdauer: ") + formatDurationCompact(usageDurationSeconds) + "\n"
+                + tr("Batch code: ", "Batchcode: ") + emptyAsMarker(batchCode) + "\n"
+                + tr("Station ID: ", "Stations-ID: ") + String.format(Locale.US, "0x%04X (%d)", stationId, stationId) + "\n"
                 + tr("Filament date: ", "Filament-Datum: ") + dateSummary + "\n\n"
                 + tr(
                 "The existing spool content will be overwritten. NTAG215 and NTAG216 are supported. "
@@ -1412,6 +1558,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                         pendingWriteMaterial = profile;
                         pendingWriteTotalWeightMg = totalWeightMg;
                         pendingWriteRemainingWeightMg = remainingWeightMg;
+                        pendingWriteUnit = unit;
+                        pendingWriteUsageDurationSeconds = usageDurationSeconds;
+                        pendingWriteStationId = stationId;
+                        pendingWriteBatchCode = batchCode;
                         pendingWriteDateMeaning = meaning;
                         pendingWriteDateEpochSeconds = dateEpochSeconds;
                         nfcState = NfcState.WAITING_WRITE;
@@ -1530,6 +1680,10 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         pendingWriteMaterial = null;
         pendingWriteTotalWeightMg = 0;
         pendingWriteRemainingWeightMg = 0;
+        pendingWriteUnit = UltimakerTagCodec.UNIT_MILLIGRAMS;
+        pendingWriteUsageDurationSeconds = BigInteger.ZERO;
+        pendingWriteStationId = UltimakerTagCodec.DEFAULT_STATION_ID;
+        pendingWriteBatchCode = UltimakerTagCodec.DEFAULT_BATCH_CODE;
         pendingWriteDateMeaning = UltimakerTagCodec.DateMeaning.NONE;
         pendingWriteDateEpochSeconds = 0;
     }
@@ -1576,6 +1730,84 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
         }
     }
 
+    private long parseRawUnitAmount(String raw, boolean allowZero) {
+        if (raw == null || raw.trim().isEmpty()) {
+            throw new IllegalArgumentException(tr(
+                    "Enter an amount.", "Bitte eine Menge eingeben."));
+        }
+        try {
+            long value = Long.parseLong(raw.trim());
+            if (value < 0 || (!allowZero && value == 0) || value > UltimakerTagCodec.MAX_UNSIGNED_INT) {
+                throw new IllegalArgumentException(tr(
+                        "Amount is outside the 32-bit tag format range.",
+                        "Menge liegt außerhalb des 32-Bit-Tagformats."));
+            }
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(tr(
+                    "Invalid integer amount.", "Ungültige ganzzahlige Menge."), exception);
+        }
+    }
+
+    private BigInteger parseUsageDurationSeconds(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return BigInteger.ZERO;
+        }
+        try {
+            BigInteger value = new BigInteger(raw.trim());
+            if (value.signum() < 0 || value.bitLength() > 64) {
+                throw new IllegalArgumentException(tr(
+                        "Usage duration must be between 0 and 2^64-1 seconds.",
+                        "Nutzungsdauer muss zwischen 0 und 2^64-1 Sekunden liegen."));
+            }
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(tr(
+                    "Invalid usage duration in seconds.",
+                    "Ungültige Nutzungsdauer in Sekunden."), exception);
+        }
+    }
+
+    private String parseBatchCode(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException(tr(
+                    "Batch code must not contain null bytes.",
+                    "Batchcode darf keine Nullbytes enthalten."));
+        }
+        if (value.getBytes(StandardCharsets.UTF_8).length > UltimakerTagCodec.MAX_BATCH_CODE_BYTES) {
+            throw new IllegalArgumentException(tr(
+                    "Batch code exceeds 64 UTF-8 bytes.",
+                    "Batchcode überschreitet 64 UTF-8-Byte."));
+        }
+        return value;
+    }
+
+    private int parseStationId(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return UltimakerTagCodec.DEFAULT_STATION_ID;
+        }
+        String trimmed = raw.trim();
+        try {
+            int value;
+            if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
+                value = Integer.parseInt(trimmed.substring(2), 16);
+            } else {
+                value = Integer.parseInt(trimmed, 10);
+            }
+            if (value < 0 || value > UltimakerTagCodec.MAX_STATION_ID) {
+                throw new IllegalArgumentException(tr(
+                        "Station ID must be between 0 and 65535 (0xFFFF).",
+                        "Stations-ID muss zwischen 0 und 65535 (0xFFFF) liegen."));
+            }
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(tr(
+                    "Invalid station ID (use 0..65535 or 0x0000..0xFFFF).",
+                    "Ungültige Stations-ID (0..65535 oder 0x0000..0xFFFF)."), exception);
+        }
+    }
+
     private long parseOptionalWeightMg(String raw) {
         if (raw == null || raw.trim().isEmpty()) {
             return 0L;
@@ -1613,10 +1845,25 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
 
         textBatch.setText(formatSummaryDateLine(decoded));
         textStation.setText(getString(R.string.result_usage_duration) + ": "
-                + formatDurationCompact(decoded.getTotalUsageDurationSecondsUnsigned()));
+                + formatDurationCompact(decoded.getTotalUsageDurationSecondsUnsigned()) + "\n"
+                + getString(R.string.label_batch) + ": "
+                + summaryValue(decoded.getBatchCode(), unavailable) + "\n"
+                + getString(R.string.label_station) + ": "
+                + String.format(Locale.US, "0x%04X (%d)", decoded.getStationId(), decoded.getStationId()) + "\n"
+                + formatSummaryOriginAndSignature(decoded));
         textChipUid.setText(getString(R.string.result_chip_uid) + ": " + uid);
         textMaterialGuidSummary.setText(getString(R.string.result_material_guid)
                 + ": " + decoded.getMaterialGuid());
+
+        if (editBatchCode != null && !decoded.getBatchCode().isEmpty()) {
+            editBatchCode.setText(decoded.getBatchCode());
+        }
+        if (editStationId != null) {
+            editStationId.setText(String.format(Locale.US, "0x%04X", decoded.getStationId()));
+        }
+        if (editUsageDurationSeconds != null) {
+            editUsageDurationSeconds.setText(decoded.getTotalUsageDurationSecondsUnsigned().toString());
+        }
 
         lastDetailsText = buildFullDetails(uid, decoded);
         lastRawDumpText = buildRawDump(memory);
@@ -1874,6 +2121,44 @@ public final class MainActivity extends Activity implements NfcAdapter.ReaderCal
                 .multiply(BigDecimal.valueOf(100L))
                 .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP);
         return localizeDecimal(percent.toPlainString()) + "%";
+    }
+
+    private String formatSummaryOriginAndSignature(UltimakerTagCodec.DecodedSpool decoded) {
+        boolean isSpoolMaker = decoded.isSpoolMakerTag()
+                || decoded.getStationId() == UltimakerTagCodec.DEFAULT_STATION_ID;
+        boolean hasCryptoSig = decoded.isSignaturePresent()
+                && decoded.getSignaturePayloadHex().length() > 4;
+
+        String origin;
+        if (hasCryptoSig) {
+            origin = tr("UltiMaker (cryptographically signed)",
+                    "UltiMaker (kryptografisch signiert)");
+        } else if (!isSpoolMaker && "0000".equals(decoded.getMaterialTrailingHex())
+                && decoded.hasExpectedSigMarker()) {
+            origin = tr("Original UltiMaker factory tag (unsigned 0x2000)",
+                    "Originaler UltiMaker-Werkstag (unsigniert 0x2000)");
+        } else if (isSpoolMaker) {
+            origin = tr("SpoolMaker (not produced by UltiMaker)",
+                    "SpoolMaker (nicht von UltiMaker produziert)");
+        } else {
+            origin = tr("Custom / modified tag", "Benutzerdefinierter / geänderter Tag");
+        }
+
+        String sigStatus;
+        if (!decoded.isSignaturePresent()) {
+            sigStatus = tr("Missing", "Fehlt");
+        } else if (hasCryptoSig) {
+            sigStatus = tr("M2M ECDSA signature (" + (decoded.getSignaturePayloadHex().length() / 2) + " B)",
+                    "M2M-ECDSA-Signatur (" + (decoded.getSignaturePayloadHex().length() / 2) + " B)");
+        } else if (decoded.hasExpectedSigMarker()) {
+            sigStatus = tr("0x2000 (NoSignaturePresent marker OK)",
+                    "0x2000 (NoSignaturePresent-Marker OK)");
+        } else {
+            sigStatus = "0x" + emptyAsMarker(decoded.getSignaturePayloadHex());
+        }
+
+        return tr("Producer: ", "Hersteller-Tag: ") + origin + "\n"
+                + tr("Signature: ", "Signatur: ") + sigStatus;
     }
 
     private String formatSummaryDateLine(UltimakerTagCodec.DecodedSpool decoded) {
